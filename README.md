@@ -13,7 +13,7 @@ Add to your MCP client config (Claude Desktop, Claude Code, etc.):
   "mcpServers": {
     "roo": {
       "command": "npx",
-      "args": ["-y", "roo-mcp"],
+      "args": ["-y", "@roo-bz/roo-mcp"],
       "env": { "ROO_API_KEY": "your-roo-api-key" }
     }
   }

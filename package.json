@@ -1,5 +1,5 @@
 {
-  "name": "roo-mcp",
+  "name": "@roo-bz/roo-mcp",
   "version": "0.1.0",
   "description": "MCP server for the Roo (roo.bz) smart-shortlink API — create, manage, and configure add-ons (scheduled/click-count redirects, webhooks, preview links, QR codes) on Roo shortlinks from any MCP-capable AI client.",
   "type": "module",
@@ -36,14 +36,14 @@
     "claude"
   ],
   "license": "MIT",
-  "author": "",
-  "homepage": "https://roo.bz",
+  "author": "David Zisner <support@roo.bz>",
+  "homepage": "https://github.com/roo-bz/roo-mcp#readme",
   "repository": {
     "type": "git",
-    "url": ""
+    "url": "git+https://github.com/roo-bz/roo-mcp.git"
   },
   "bugs": {
-    "url": ""
+    "url": "https://github.com/roo-bz/roo-mcp/issues"
   },
   "publishConfig": {
     "access": "public"
