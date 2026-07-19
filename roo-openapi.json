@@ -1,0 +1,910 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "version": "1.2",
+    "title": "Roo API"
+  },
+  "host": "api.roo.bz",
+  "schemes": [
+    "https"
+  ],
+  "paths": {
+    "/v1/me": {
+      "options": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "schema": {
+              "$ref": "#/definitions/Empty"
+            },
+            "headers": {
+              "Access-Control-Allow-Origin": {
+                "type": "string"
+              },
+              "Access-Control-Allow-Methods": {
+                "type": "string"
+              },
+              "Access-Control-Allow-Headers": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Get current user details. Used mainly to confirm the API key works.",
+        "responses": {
+          "200": {
+            "description": "Returns basic account details."
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/v1/urls": {
+      "parameters": [
+        {
+          "in": "query",
+          "name": "limit",
+          "description": "Results page size",
+          "type": "integer"
+        },
+        {
+          "in": "query",
+          "name": "lastKey",
+          "description": "Results page key (get value from previous page response)",
+          "type": "string"
+        }
+      ],
+      "options": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "schema": {
+              "$ref": "#/definitions/Empty"
+            },
+            "headers": {
+              "Access-Control-Allow-Origin": {
+                "type": "string"
+              },
+              "Access-Control-Allow-Methods": {
+                "type": "string"
+              },
+              "Access-Control-Allow-Headers": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Get list of shortlinks.",
+        "responses": {
+          "200": {
+            "description": "Returns a list of shortlinks.",
+            "schema": {
+              "$ref": "#/definitions/ShortlinkRecordList"
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      },
+      "post": {
+        "summary": "Create a new shortlink.",
+        "description": "Create a new shortlink. Supports a simple redirect or a redirect with add-ons (scheduledRedirect, clickCountRedirect, webhook, previewLink, qrCode).\n\n**Simple redirect example:**\n\n```bash\ncurl -X POST \"https://api.roo.bz/v1/urls\" \\\n  -H \"X-Api-Key: ******\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"url\": \"https://www.kipanga.com.au/\"\n  }'\n```\n\n**With add-ons example (includes all add-on types):**\n\n> ⚠️ There are two types of scheduled redirects — time-based (`scheduledRedirect`) and click-based (`clickCountRedirect`). If using both, make sure they don't clash and break your expected behaviour.\n\n```bash\ncurl -X POST \"https://api.roo.bz/v1/urls\" \\\n  -H \"X-Api-Key: ******\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\n    \"url\": \"https://www.kipanga.com.au/\",\n    \"addOns\": [\n      {\n        \"addOn\": \"clickCountRedirect\",\n        \"enabled\": true,\n        \"data\": {\n          \"schedule\": [\n            { \"url\": \"https://fourday.ai/\",  \"clickCount\": 3 },\n            { \"url\": \"https://youtube.com/\", \"clickCount\": 5 }\n          ]\n        }\n      },\n      {\n        \"addOn\": \"scheduledRedirect\",\n        \"enabled\": true,\n        \"data\": {\n          \"schedule\": [\n            { \"url\": \"https://fourday.ai/\",  \"timestamp\": 1736477880 },\n            { \"url\": \"https://youtube.com/\", \"timestamp\": 1736478000 }\n          ]\n        }\n      },\n      {\n        \"addOn\": \"webhook\",\n        \"enabled\": true,\n        \"data\": {\n          \"name\": \"Test\",\n          \"endpoint\": \"https://eofhbh0hvdnyiew.m.pipedream.net\",\n          \"method\": \"POST\",\n          \"headers\": {},\n          \"queryString\": {},\n          \"contentType\": \"application/json\",\n          \"body\": \"{}\",\n          \"addMetadata\": true\n        }\n      },\n      {\n        \"addOn\": \"previewLink\",\n        \"enabled\": true,\n        \"data\": {\n          \"title\": \"test title\",\n          \"description\": \"test description\",\n          \"image\": \"data:image/png;base64,iVBORw0KGgo...\"\n        }\n      },\n      {\n        \"addOn\": \"qrCode\",\n        \"enabled\": true,\n        \"data\": {\n          \"codeColor\": \"#58CB96\",\n          \"backgroundColor\": \"#FFFFFF\",\n          \"qtType\": \"mode_6\",\n          \"scale\": 1,\n          \"logo\": \"\",\n          \"displayRooLogo\": false\n        }\n      }\n    ]\n  }'\n```\n\nSet `addMetadata` to `false` on the webhook add-on if you don't want extra click data added to the webhook call.\n\nFor `previewLink`, send `image` as a base64 data URI when uploading a new image; when editing without changing the image, send back the `image_url` returned by the server instead.",
+        "consumes": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "shortlink",
+            "description": "Shortlink details",
+            "schema": {
+              "$ref": "#/definitions/Shortlink"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shortlink was successfully created.",
+            "schema": {
+              "$ref": "#/definitions/ShortlinkCreated"
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/v1/urls/{id}": {
+      "get": {
+        "summary": "Get a shortlink based on ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The shortlink record.",
+            "schema": {
+              "$ref": "#/definitions/ShortlinkRecord"
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      },
+      "patch": {
+        "summary": "Update an existing shortlink.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "in": "body",
+            "name": "shortlink",
+            "description": "Shortlink details",
+            "schema": {
+              "$ref": "#/definitions/Shortlink"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shortlink was successfully updated.",
+            "schema": {
+              "$ref": "#/definitions/ShortlinkUpdated"
+            }
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/v1/urls/{id}/add-on": {
+      "options": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "schema": {
+              "$ref": "#/definitions/Empty"
+            },
+            "headers": {
+              "Access-Control-Allow-Origin": {
+                "type": "string"
+              },
+              "Access-Control-Allow-Methods": {
+                "type": "string"
+              },
+              "Access-Control-Allow-Headers": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Set an add-on for an existing shortlink.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "in": "body",
+            "name": "addOn",
+            "description": "Add-on details",
+            "schema": {
+              "$ref": "#/definitions/AddOn"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shortlink was successfully updated."
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/v1/urls/{id}/permanent-shortlink": {
+      "options": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "schema": {
+              "$ref": "#/definitions/Empty"
+            },
+            "headers": {
+              "Access-Control-Allow-Origin": {
+                "type": "string"
+              },
+              "Access-Control-Allow-Methods": {
+                "type": "string"
+              },
+              "Access-Control-Allow-Headers": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Mark a shortlink as permanent.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shortlink was successfully marked permanent."
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      },
+      "patch": {
+        "summary": "Update permanent shortlink settings.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Permanent shortlink was successfully updated."
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    },
+    "/v1/urls/{id}/qr-code": {
+      "options": {
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "schema": {
+              "$ref": "#/definitions/Empty"
+            },
+            "headers": {
+              "Access-Control-Allow-Origin": {
+                "type": "string"
+              },
+              "Access-Control-Allow-Methods": {
+                "type": "string"
+              },
+              "Access-Control-Allow-Headers": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Get the QR code for a shortlink.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns the QR code for the shortlink."
+          }
+        },
+        "security": [
+          {
+            "api_key": []
+          }
+        ]
+      }
+    }
+  },
+  "securityDefinitions": {
+    "api_key": {
+      "type": "apiKey",
+      "name": "x-api-key",
+      "in": "header"
+    }
+  },
+  "definitions": {
+    "Empty": {
+      "type": "object",
+      "title": "Empty Schema"
+    },
+    "Shortlink": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "The destination URL"
+        },
+        "addOns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AddOn"
+          }
+        },
+        "customDomain": {
+          "$ref": "#/definitions/CustomDomain"
+        }
+      },
+      "required": [
+        "url"
+      ]
+    },
+    "AddOn": {
+      "type": "object",
+      "discriminator": "addOn",
+      "required": [
+        "addOn",
+        "enabled",
+        "data"
+      ],
+      "properties": {
+        "addOn": {
+          "type": "string",
+          "description": "Type of the add-on",
+          "enum": [
+            "scheduledRedirect",
+            "clickCountRedirect",
+            "webhook",
+            "previewLink",
+            "qrCode"
+          ]
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Used to enable/disable the add-on"
+        },
+        "data": {
+          "type": "object",
+          "description": "Payload depends on the value of addOn"
+        }
+      }
+    },
+    "AddOnScheduledRedirect": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/AddOn"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "addOn": {
+              "type": "string",
+              "enum": [
+                "scheduledRedirect"
+              ]
+            },
+            "data": {
+              "$ref": "#/definitions/ScheduledRedirectData"
+            }
+          }
+        }
+      ]
+    },
+    "AddOnClickCountRedirect": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/AddOn"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "addOn": {
+              "type": "string",
+              "enum": [
+                "clickCountRedirect"
+              ]
+            },
+            "data": {
+              "$ref": "#/definitions/ClickCountRedirectData"
+            }
+          }
+        }
+      ]
+    },
+    "AddOnWebhook": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/AddOn"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "addOn": {
+              "type": "string",
+              "enum": [
+                "webhook"
+              ]
+            },
+            "data": {
+              "$ref": "#/definitions/WebhookData"
+            }
+          }
+        }
+      ]
+    },
+    "AddOnPreviewLink": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/AddOn"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "addOn": {
+              "type": "string",
+              "enum": [
+                "previewLink"
+              ]
+            },
+            "data": {
+              "$ref": "#/definitions/PreviewLinkData"
+            }
+          }
+        }
+      ]
+    },
+    "AddOnQrCode": {
+      "allOf": [
+        {
+          "$ref": "#/definitions/AddOn"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "addOn": {
+              "type": "string",
+              "enum": [
+                "qrCode"
+              ]
+            },
+            "data": {
+              "$ref": "#/definitions/QrCodeData"
+            }
+          }
+        }
+      ]
+    },
+    "ScheduledRedirectItem": {
+      "type": "object",
+      "required": [
+        "timestamp",
+        "url"
+      ],
+      "properties": {
+        "timestamp": {
+          "type": "integer",
+          "format": "int64",
+          "description": "Unix epoch timestamp (seconds) when redirect takes effect",
+          "example": 1780132320
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Destination URL at this schedule point",
+          "example": "https://test.com"
+        }
+      }
+    },
+    "ScheduledRedirectData": {
+      "type": "object",
+      "required": [
+        "schedule"
+      ],
+      "properties": {
+        "schedule": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/ScheduledRedirectItem"
+          }
+        }
+      }
+    },
+    "ClickCountRedirectItem": {
+      "type": "object",
+      "required": [
+        "clickCount",
+        "url"
+      ],
+      "properties": {
+        "clickCount": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Redirect after this many clicks",
+          "example": 1
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Destination URL at this click threshold",
+          "example": "https://test.com"
+        }
+      }
+    },
+    "ClickCountRedirectData": {
+      "type": "object",
+      "required": [
+        "schedule"
+      ],
+      "properties": {
+        "schedule": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/ClickCountRedirectItem"
+          }
+        }
+      }
+    },
+    "WebhookData": {
+      "type": "object",
+      "required": [
+        "name",
+        "method",
+        "body",
+        "contentType",
+        "endpoint",
+        "addMetadata",
+        "headers",
+        "queryString"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Display name for the webhook",
+          "example": "Test"
+        },
+        "method": {
+          "type": "string",
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "HEAD",
+            "OPTIONS"
+          ],
+          "example": "POST"
+        },
+        "body": {
+          "type": "string",
+          "description": "Request body content (JSON string, form data, etc.)",
+          "example": "{\n  \"abc\": \"value\"\n}"
+        },
+        "contentType": {
+          "type": "string",
+          "enum": [
+            "application/json",
+            "application/x-www-form-urlencoded",
+            "multipart/form-data",
+            "application/xml",
+            "text/plain",
+            "application/octet-stream"
+          ],
+          "example": "application/json"
+        },
+        "endpoint": {
+          "type": "string",
+          "format": "uri",
+          "description": "Webhook target URL",
+          "example": "https://test.com"
+        },
+        "addMetadata": {
+          "type": "boolean",
+          "description": "Include shortlink metadata in the webhook payload",
+          "example": true
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Custom HTTP headers",
+          "example": {}
+        },
+        "queryString": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Query string parameters appended to the endpoint",
+          "example": {}
+        }
+      }
+    },
+    "PreviewLinkData": {
+      "type": "object",
+      "required": [
+        "title",
+        "description"
+      ],
+      "properties": {
+        "image": {
+          "type": "string",
+          "description": "Base64 data URI when uploading a new image (e.g. data:image/png;base64,...)"
+        },
+        "image_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Hosted image URL returned by the server; send back when not changing the image"
+        },
+        "title": {
+          "type": "string",
+          "example": "test title"
+        },
+        "description": {
+          "type": "string",
+          "example": "test description"
+        }
+      }
+    },
+    "QrCodeData": {
+      "type": "object",
+      "required": [
+        "codeColor",
+        "backgroundColor",
+        "qtType",
+        "scale",
+        "logo",
+        "displayRooLogo"
+      ],
+      "properties": {
+        "codeColor": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "description": "QR code foreground color (hex)",
+          "example": "#58CB96"
+        },
+        "backgroundColor": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "description": "QR code background color (hex)",
+          "example": "#FFFFFF"
+        },
+        "qtType": {
+          "type": "string",
+          "enum": [
+            "mode_1",
+            "mode_2",
+            "mode_3",
+            "mode_4",
+            "mode_5",
+            "mode_6",
+            "mode_7",
+            "mode_8",
+            "mode_9"
+          ],
+          "description": "QR code dot/corner style pattern",
+          "example": "mode_6"
+        },
+        "scale": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "QR code size multiplier",
+          "example": 1
+        },
+        "logo": {
+          "type": "string",
+          "description": "Center logo as base64 data URI; empty string if no logo",
+          "example": ""
+        },
+        "displayRooLogo": {
+          "type": "boolean",
+          "description": "Show Roo branding on the QR code",
+          "example": false
+        }
+      }
+    },
+    "CustomDomain": {
+      "type": "object",
+      "properties": {
+        "domain": {
+          "type": "string",
+          "description": "Your verified custom domain"
+        },
+        "slug": {
+          "type": "string",
+          "description": "The back part of the shortlink, must be unique for the selected custom domain"
+        },
+        "alternativeSlug": {
+          "type": "boolean",
+          "description": "When the selected slug already exists then if this flag is true then resort to a random string, else error out"
+        }
+      }
+    },
+    "ShortlinkRecordAttribs": {
+      "type": "object",
+      "properties": {
+        "UserId": {
+          "type": "string",
+          "description": "Creator User ID"
+        },
+        "TargetUrl": {
+          "type": "string",
+          "description": "Destination URL"
+        }
+      }
+    },
+    "ShortlinkRecord": {
+      "type": "object",
+      "properties": {
+        "CreatedDate": {
+          "type": "number",
+          "description": "Shortlink create epoch timestamp"
+        },
+        "UpdatedDate": {
+          "type": "number",
+          "description": "Shortlink update epoch timestamp"
+        },
+        "Attributes": {
+          "$ref": "#/definitions/ShortlinkRecordAttribs"
+        },
+        "Counter": {
+          "type": "number",
+          "description": "Shortlink visit counter"
+        },
+        "addOns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AddOn"
+          }
+        },
+        "customDomain": {
+          "$ref": "#/definitions/CustomDomain"
+        }
+      }
+    },
+    "ShortlinkRecordList": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ShortlinkRecord"
+          },
+          "description": "Shortlinks array"
+        },
+        "nextKey": {
+          "type": "string",
+          "description": "Key for requesting the next page of results"
+        }
+      }
+    },
+    "ShortlinkCreated": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "shortUrl": {
+          "type": "string",
+          "description": "The created shortlink"
+        },
+        "message": {
+          "type": "string",
+          "description": "system message when required"
+        }
+      }
+    },
+    "ShortlinkUpdated": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string",
+          "description": "system message when required"
+        }
+      }
+    }
+  }
+}
