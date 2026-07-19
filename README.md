@@ -1,10 +1,12 @@
 # roo-mcp
 
+[![npm version](https://img.shields.io/npm/v/@roo-bz/roo-mcp.svg)](https://www.npmjs.com/package/@roo-bz/roo-mcp) [![node](https://img.shields.io/node/v/@roo-bz/roo-mcp.svg)](https://www.npmjs.com/package/@roo-bz/roo-mcp) [![license](https://img.shields.io/npm/l/@roo-bz/roo-mcp.svg)](./LICENSE)
+
 MCP server for [Roo](https://roo.bz) — the smart-shortlink API. Exposes Roo's link + add-on operations as thin, well-shaped MCP tools an LLM can use directly.
 
-Status: **early scaffolding** — `roo_whoami` first, rest coming behind it.
+**New here?** See [SETUP.md](./SETUP.md) for a step-by-step install guide (Claude Desktop, Claude Code, Cursor).
 
-## Install (once published)
+## Install
 
 Add to your MCP client config (Claude Desktop, Claude Code, etc.):
 

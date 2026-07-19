@@ -11,5 +11,8 @@ Thumbs.db
 # scratchpad artifacts
 scratchpad/
 
+# npm pack artifacts
+*.tgz
+
 # Claude Code local project state
 .claude/
