@@ -26,12 +26,10 @@ Detect the OS + which MCP client the user has installed by checking for the conf
 
 ## Step 1 — Get your Roo API key
 
-1. Sign in at [https://roo.bz](https://roo.bz).
-2. Open your account settings and look for the **API keys** section.
-3. Create a new key (name it something like `mcp-desktop`) and copy the value. It looks like `roo_live_xxxxxxxx…`.
+1. Create a new account at [https://app.roo.bz](https://app.roo.bz).
+2. Open the account settings and navigate to the **Api Keys** tab.
+3. Press the copy button next to the API key.
 4. Keep the tab open — you'll paste this into Step 3.
-
-If you lose the key later, generate a new one and update the config. Roo shows the key value only at creation time.
 
 ## Step 2 — Pick your MCP client and locate its config
 
