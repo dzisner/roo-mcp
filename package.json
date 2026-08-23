@@ -37,13 +37,13 @@
   ],
   "license": "MIT",
   "author": "David Zisner <support@roo.bz>",
-  "homepage": "https://github.com/roo-bz/roo-mcp#readme",
+  "homepage": "https://github.com/dzisner/roo-mcp#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/roo-bz/roo-mcp.git"
+    "url": "git+https://github.com/dzisner/roo-mcp.git"
   },
   "bugs": {
-    "url": "https://github.com/roo-bz/roo-mcp/issues"
+    "url": "https://github.com/dzisner/roo-mcp/issues"
   },
   "publishConfig": {
     "access": "public"

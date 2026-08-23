@@ -1,0 +1,636 @@
+<title>Install Roo in Claude</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --paper: #FCFAF6;
+    --paper-2: #F1EDE5;
+    --card: #FFFFFF;
+    --ink: #1A1E1B;
+    --ink-2: #3E4640;
+    --muted: #6C6F6A;
+    --rule: #E4E1D9;
+    --accent: #2FA675;
+    --accent-soft: #DBEEE3;
+    --tip: #A97321;
+    --tip-soft: #F5EBD6;
+    --warn: #B84A2F;
+    --warn-soft: #F5E1D9;
+    --code-bg: #1B211D;
+    --code-ink: #E9ECE4;
+    --code-comment: #7A857F;
+    --highlight: #F4C86E;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "Roboto Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #10130F;
+      --paper-2: #191D17;
+      --card: #191D17;
+      --ink: #E9ECE4;
+      --ink-2: #B7BDB4;
+      --muted: #808780;
+      --rule: #262A24;
+      --accent: #5FC894;
+      --accent-soft: #142219;
+      --tip: #E0A756;
+      --tip-soft: #26200F;
+      --warn: #E27A5A;
+      --warn-soft: #221410;
+      --code-bg: #060907;
+      --code-ink: #E9ECE4;
+      --code-comment: #7A857F;
+      --highlight: #C0904A;
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #FCFAF6; --paper-2: #F1EDE5; --card: #FFFFFF; --ink: #1A1E1B;
+    --ink-2: #3E4640; --muted: #6C6F6A; --rule: #E4E1D9; --accent: #2FA675;
+    --accent-soft: #DBEEE3; --tip: #A97321; --tip-soft: #F5EBD6;
+    --warn: #B84A2F; --warn-soft: #F5E1D9;
+    --code-bg: #1B211D; --code-ink: #E9ECE4; --code-comment: #7A857F;
+    --highlight: #F4C86E;
+  }
+  :root[data-theme="dark"] {
+    --paper: #10130F; --paper-2: #191D17; --card: #191D17; --ink: #E9ECE4;
+    --ink-2: #B7BDB4; --muted: #808780; --rule: #262A24; --accent: #5FC894;
+    --accent-soft: #142219; --tip: #E0A756; --tip-soft: #26200F;
+    --warn: #E27A5A; --warn-soft: #221410;
+    --code-bg: #060907; --code-ink: #E9ECE4; --code-comment: #7A857F;
+    --highlight: #C0904A;
+  }
+
+  html { background: var(--paper); color: var(--ink); font-family: var(--sans); }
+  body {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 4.5rem 1.5rem 6rem;
+    font-family: var(--sans);
+    font-size: 17px;
+    line-height: 1.65;
+    color: var(--ink-2);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── typography ─────────────────────────────────────────── */
+  h1 {
+    font-family: var(--sans);
+    font-size: 2.5rem;
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    color: var(--ink);
+    margin: 0 0 0.6rem;
+    text-wrap: balance;
+  }
+  h1 em {
+    font-style: normal;
+    color: var(--accent);
+  }
+  .lede {
+    font-size: 1.1rem;
+    color: var(--muted);
+    margin: 0;
+    text-wrap: balance;
+  }
+  h2 {
+    font-family: var(--sans);
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 0.4rem;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  p { margin: 0; }
+  p + p { margin-top: 0.7rem; }
+  strong { color: var(--ink); font-weight: 600; }
+  a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1.5px solid var(--accent-soft);
+    padding-bottom: 1px;
+    font-weight: 500;
+  }
+  a:hover { border-bottom-color: var(--accent); }
+  a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* ── page header ────────────────────────────────────────── */
+  header.hero {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    margin-bottom: 3rem;
+    padding-bottom: 2.5rem;
+    border-bottom: 1px solid var(--rule);
+  }
+  header.hero .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  /* ── needs ──────────────────────────────────────────────── */
+  section.needs {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    padding: 1.5rem 1.5rem 1.3rem;
+    margin-bottom: 3.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+  section.needs h2 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 700;
+    color: var(--muted);
+    margin: 0;
+  }
+  section.needs ul {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  section.needs li {
+    position: relative;
+    padding-left: 1.85rem;
+    color: var(--ink-2);
+  }
+  section.needs li::before {
+    content: "✓";
+    position: absolute;
+    left: 0;
+    top: 0;
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 1rem;
+    line-height: 1.65;
+  }
+
+  /* ── step cards ─────────────────────────────────────────── */
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 3rem;
+    counter-reset: step;
+  }
+  article.step {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 3.2rem 1fr;
+    gap: 1.1rem;
+    align-items: start;
+  }
+  article.step::before {
+    content: counter(step);
+    font-family: var(--sans);
+    font-size: 2.1rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+    padding-top: 0.05em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  article.step > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    min-width: 0;
+  }
+  article.step > div > p { margin: 0; }
+  article.step ul {
+    margin: 0.3rem 0 0;
+    padding-left: 1.15rem;
+    color: var(--ink-2);
+  }
+  article.step li + li { margin-top: 0.3rem; }
+
+  /* ── OS toggle ──────────────────────────────────────────── */
+  .os-toggle {
+    display: inline-flex;
+    background: var(--paper-2);
+    border-radius: 999px;
+    padding: 3px;
+    gap: 0;
+    align-self: flex-start;
+  }
+  .os-toggle button {
+    font-family: var(--sans);
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--muted);
+    background: transparent;
+    border: 0;
+    padding: 0.4rem 0.95rem;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background 120ms, color 120ms;
+  }
+  .os-toggle button[aria-pressed="true"] {
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .os-toggle button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .os-panel { display: none; }
+  .os-panel.active { display: flex; flex-direction: column; gap: 0.6rem; }
+  .path {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    padding: 0.55rem 0.75rem;
+    background: var(--paper-2);
+    border-radius: 5px;
+    color: var(--ink);
+    word-break: break-all;
+    display: block;
+  }
+
+  /* ── code block with copy ───────────────────────────────── */
+  .snippet {
+    position: relative;
+    margin: 0.4rem 0;
+    border-radius: 8px;
+    background: var(--code-bg);
+    overflow: hidden;
+  }
+  .snippet pre {
+    margin: 0;
+    padding: 1.1rem 1.1rem 1.1rem 1.1rem;
+    background: transparent;
+    color: var(--code-ink);
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    line-height: 1.65;
+    overflow-x: auto;
+    tab-size: 2;
+  }
+  .snippet .placeholder {
+    background: var(--highlight);
+    color: #1A1E1B;
+    padding: 0.05em 0.35em;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+  .snippet .comment { color: var(--code-comment); font-style: italic; }
+  .snippet button.copy {
+    position: absolute;
+    top: 0.55rem;
+    right: 0.55rem;
+    font-family: var(--sans);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--code-ink);
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 5px;
+    padding: 0.35rem 0.7rem;
+    cursor: pointer;
+    transition: background 120ms;
+  }
+  .snippet button.copy:hover { background: rgba(255,255,255,0.15); }
+  .snippet button.copy.done {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #04150C;
+  }
+
+  /* ── callouts ───────────────────────────────────────────── */
+  .tip, .warn {
+    background: var(--tip-soft);
+    border-left: 3px solid var(--tip);
+    padding: 0.75rem 0.95rem;
+    border-radius: 0 6px 6px 0;
+    font-size: 0.92rem;
+    color: var(--ink-2);
+  }
+  .warn {
+    background: var(--warn-soft);
+    border-left-color: var(--warn);
+  }
+  .tip .label, .warn .label {
+    font-family: var(--sans);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--tip);
+    margin-right: 0.4rem;
+  }
+  .warn .label { color: var(--warn); }
+
+  /* ── try it ─────────────────────────────────────────────── */
+  section.try {
+    margin-top: 4rem;
+    padding: 1.8rem 1.6rem 1.5rem;
+    background: var(--accent-soft);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+  section.try h2 {
+    color: var(--accent);
+    font-size: 1.05rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin: 0;
+  }
+  section.try ul {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    margin: 0;
+    padding-left: 1.15rem;
+    color: var(--ink-2);
+  }
+  section.try li em {
+    color: var(--ink);
+    font-style: italic;
+    font-weight: 500;
+  }
+
+  /* ── troubleshoot / footer ──────────────────────────────── */
+  section.trouble {
+    margin-top: 4rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  section.trouble h2 {
+    font-size: 1.05rem;
+  }
+  details {
+    background: var(--paper-2);
+    border-radius: 6px;
+    padding: 0.9rem 1.1rem;
+    color: var(--ink-2);
+    font-size: 0.94rem;
+  }
+  details + details { margin-top: 0.6rem; }
+  details[open] { padding-bottom: 1rem; }
+  details summary {
+    cursor: pointer;
+    color: var(--ink);
+    font-weight: 600;
+    list-style: none;
+  }
+  details summary::marker, details summary::-webkit-details-marker { display: none; }
+  details summary::before {
+    content: "+";
+    display: inline-block;
+    width: 1.2rem;
+    color: var(--accent);
+    font-weight: 700;
+  }
+  details[open] summary::before { content: "−"; }
+  details > p, details > ul { margin-top: 0.6rem; }
+  details code {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    padding: 0.05em 0.3em;
+    background: rgba(0,0,0,0.06);
+    border-radius: 3px;
+    color: var(--ink);
+  }
+  :root[data-theme="dark"] details code { background: rgba(255,255,255,0.06); }
+  @media (prefers-color-scheme: dark) {
+    details code { background: rgba(255,255,255,0.06); }
+  }
+
+  footer.doc {
+    margin-top: 4rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-align: center;
+  }
+  footer.doc a { color: var(--muted); border-bottom-color: var(--rule); }
+  footer.doc a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── inline text code ───────────────────────────────────── */
+  code:not(pre code, .path, details code) {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    padding: 0.05em 0.35em;
+    background: var(--paper-2);
+    border-radius: 3px;
+    color: var(--ink);
+  }
+
+  @media (max-width: 460px) {
+    body { padding: 3rem 1.1rem 5rem; }
+    h1 { font-size: 2rem; }
+    article.step { grid-template-columns: 2.4rem 1fr; gap: 0.8rem; }
+    article.step::before { font-size: 1.7rem; }
+  }
+</style>
+
+<header class="hero">
+  <p class="eyebrow">Setup · 5 minutes</p>
+  <h1>Use <em>Roo</em> shortlinks<br>right inside Claude.</h1>
+  <p class="lede">A one-time setup so you can ask Claude to make shortlinks, add QR codes, or fire off webhooks — all in plain English.</p>
+</header>
+
+<section class="needs">
+  <h2>Before you start, you'll need</h2>
+  <ul>
+    <li>An account on <a href="https://app.roo.bz">roo.bz</a> — the free "Hop" plan works fine.</li>
+    <li>The <strong>Claude Desktop</strong> app — download it at <a href="https://claude.ai/download">claude.ai/download</a> if you don't have it.</li>
+    <li><strong>Node.js</strong>, version 18 or newer, installed once. If you're not sure, we'll check in Step 2.</li>
+  </ul>
+</section>
+
+<div class="steps">
+
+  <!-- ─── 1. get key ─── -->
+  <article class="step">
+    <div>
+      <h2>Get your Roo API key</h2>
+      <p>Sign into <a href="https://app.roo.bz">app.roo.bz</a>. Open your account settings and go to the <strong>Api Keys</strong> tab. Press the copy button next to your key.</p>
+      <div class="tip">
+        <span class="label">Keep it private</span> Treat this like a password. Don't paste it in a chat, an email, or a support ticket. In the next steps you'll put it once into a file on your own computer, and Claude reads it from there.
+      </div>
+    </div>
+  </article>
+
+  <!-- ─── 2. node ─── -->
+  <article class="step">
+    <div>
+      <h2>Make sure Node.js is installed</h2>
+      <p>This is the little runtime Roo uses under the hood. Most people already have it. To check, open your terminal (see Step 3 for how to open it on your OS) and type:</p>
+      <div class="snippet">
+        <pre><code>node --version</code></pre>
+      </div>
+      <p>If you see something like <code>v20.11.1</code> or higher, you're set. If you get "not recognized" or "command not found," install it from <a href="https://nodejs.org">nodejs.org</a> — grab the LTS button, run the installer, click through the defaults, then restart your terminal.</p>
+    </div>
+  </article>
+
+  <!-- ─── 3. open config ─── -->
+  <article class="step">
+    <div>
+      <h2>Open Claude Desktop's settings file</h2>
+      <p>This is a small text file where Claude keeps its list of connected tools. We're going to add Roo to it.</p>
+
+      <div class="os-toggle" role="tablist" aria-label="Choose your operating system">
+        <button type="button" data-os="mac" aria-pressed="true">macOS</button>
+        <button type="button" data-os="win" aria-pressed="false">Windows</button>
+      </div>
+
+      <div class="os-panel active" data-os-panel="mac">
+        <p>Open <strong>Finder</strong>, then in the menu bar choose <strong>Go → Go to Folder…</strong> (or press <code>⌘⇧G</code>). Paste this and press Return:</p>
+        <span class="path">~/Library/Application Support/Claude</span>
+        <p>You should see a file called <code>claude_desktop_config.json</code>. Right-click it and choose <strong>Open With → TextEdit</strong> (or any text editor you like). If the file doesn't exist yet, create a new plain-text file with that exact name and put the two characters <code>{}</code> in it as its content.</p>
+      </div>
+
+      <div class="os-panel" data-os-panel="win">
+        <p>Press <code>Win + R</code> to open the Run box. Paste this and press Enter:</p>
+        <span class="path">%APPDATA%\Claude</span>
+        <p>File Explorer opens on the folder. You should see <code>claude_desktop_config.json</code>. Right-click it and choose <strong>Open with → Notepad</strong>. If the file doesn't exist yet, create a new text file with that exact name (including the <code>.json</code> extension) and put the two characters <code>{}</code> in it as its content.</p>
+      </div>
+
+      <div class="tip">
+        <span class="label">Easier route (if you see it)</span> Inside Claude Desktop, open <strong>Settings → Developer → Edit Config</strong>. That opens the same file directly.
+      </div>
+    </div>
+  </article>
+
+  <!-- ─── 4. paste ─── -->
+  <article class="step">
+    <div>
+      <h2>Paste this into the file</h2>
+      <p>Replace whatever is in the file with the snippet below. Then swap <span class="placeholder">PASTE_YOUR_KEY_HERE</span> with the key you copied in Step 1. Save the file.</p>
+      <div class="snippet">
+        <button class="copy" type="button" onclick="copySnippet(this)">Copy</button>
+<pre><code id="snippet-content">{
+  "mcpServers": {
+    "roo": {
+      "command": "npx",
+      "args": ["-y", "@roo-bz/roo-mcp"],
+      "env": { "ROO_API_KEY": "<span class="placeholder">PASTE_YOUR_KEY_HERE</span>" }
+    }
+  }
+}</code></pre>
+      </div>
+      <div class="warn">
+        <span class="label">Watch the quotes</span> Keep the double quotes around your key. Don't add spaces inside them. Common mistakes: pasting a key with quotes already around it (delete the extra ones), or accidentally deleting the closing <code>}</code> at the bottom.
+      </div>
+    </div>
+  </article>
+
+  <!-- ─── 5. restart ─── -->
+  <article class="step">
+    <div>
+      <h2>Restart Claude Desktop</h2>
+      <p>Fully quit — closing the window isn't enough. On macOS, right-click the Claude icon in your Dock and choose <strong>Quit</strong> (or press <code>⌘Q</code>). On Windows, right-click the Claude icon in the system tray (bottom-right) and choose <strong>Quit</strong>.</p>
+      <p>Wait a couple of seconds, then open Claude Desktop again.</p>
+    </div>
+  </article>
+
+</div>
+
+<section class="try">
+  <h2>Try it out</h2>
+  <p>Start a new chat in Claude and try any of these:</p>
+  <ul>
+    <li><em>Check my Roo account.</em></li>
+    <li><em>Make me a Roo shortlink for https://example.com/my-page.</em></li>
+    <li><em>Create a shortlink to my landing page and generate a QR code for it too.</em></li>
+    <li><em>Show me my last 5 Roo shortlinks.</em></li>
+  </ul>
+  <p>Claude will use Roo behind the scenes and show you the new short URL, QR image, or click count right in the chat.</p>
+</section>
+
+<section class="trouble">
+  <h2>Something didn't work?</h2>
+
+  <details>
+    <summary>Claude says it doesn't know how to use Roo, or nothing happens when I ask.</summary>
+    <p>Two things to check:</p>
+    <ul>
+      <li><strong>Did you fully quit Claude Desktop?</strong> Not just close the window. Right-click the Claude icon in your Dock/tray → Quit. Then re-open.</li>
+      <li><strong>Is the settings file valid?</strong> A single missing quote or comma will break it. Copy the snippet in Step 4 again exactly, replace only the key, save, and restart.</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>I get "Roo API key is missing or invalid."</summary>
+    <p>The key in your settings file doesn't match one that Roo recognizes. Go back to <a href="https://app.roo.bz">app.roo.bz</a>, copy the key fresh (or generate a new one if you're not sure), and paste it into the file again. Save, then fully quit and re-open Claude Desktop.</p>
+  </details>
+
+  <details>
+    <summary>I don't see my custom domain — my links are on roo.ws.</summary>
+    <p>That's normal for the free plan and for most cases. Ask Claude: <em>"Show me my Roo custom domains"</em> — if your domain shows up as <code>Issued</code>, you can then ask Claude to create shortlinks on it specifically: <em>"Make a link on l.mydomain.com for https://example.com/promo, slug 'launch'."</em></p>
+  </details>
+
+  <details>
+    <summary>My question isn't here.</summary>
+    <p>See the full setup guide at <a href="https://github.com/roo-bz/roo-mcp/blob/main/SETUP.md">github.com/roo-bz/roo-mcp/blob/main/SETUP.md</a>, or open an issue at <a href="https://github.com/roo-bz/roo-mcp/issues">github.com/roo-bz/roo-mcp/issues</a>.</p>
+  </details>
+</section>
+
+<footer class="doc">
+  Made for <a href="https://roo.bz">Roo</a> · <a href="https://github.com/roo-bz/roo-mcp">source</a> · works with Claude Desktop, Claude Code, Cursor, and any client that speaks MCP.
+</footer>
+
+<script>
+  // OS toggle — swaps the visible path/instructions in Step 3
+  const osButtons = document.querySelectorAll('.os-toggle button');
+  const osPanels = document.querySelectorAll('.os-panel');
+  osButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const os = btn.dataset.os;
+      osButtons.forEach((b) => b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'));
+      osPanels.forEach((p) => p.classList.toggle('active', p.dataset.osPanel === os));
+    });
+  });
+
+  // Auto-pick OS on load
+  (function () {
+    const isWin = /Windows/i.test(navigator.userAgent);
+    if (isWin) {
+      const winBtn = document.querySelector('.os-toggle button[data-os="win"]');
+      if (winBtn) winBtn.click();
+    }
+  })();
+
+  // Copy button
+  function copySnippet(btn) {
+    const el = document.getElementById('snippet-content');
+    if (!el) return;
+    // Extract text without the highlight styling — replace with the placeholder text
+    const text = el.innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      const original = btn.textContent;
+      btn.textContent = 'Copied ✓';
+      btn.classList.add('done');
+      setTimeout(() => { btn.textContent = original; btn.classList.remove('done'); }, 1800);
+    }).catch(() => {
+      btn.textContent = 'Press Ctrl/⌘+C';
+      setTimeout(() => { btn.textContent = 'Copy'; }, 1800);
+    });
+  }
+</script>
