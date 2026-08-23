@@ -225,6 +225,34 @@ try {
   console.log(`  -> stat failed: ${e.message}`);
 }
 
+// ── Custom-slug validation: passing `slug` without `domain`, or with a Roo-default
+// `domain`, should fail at the tool boundary before any HTTP call. Regression cover
+// for the bug where these cases silently created a random-slug link on roo.ws
+// (Roo ignored the slug field). Both should now return isError with a helpful message.
+console.log('\n=== custom-slug validation: slug-without-domain should fail tool-side ===');
+const slugNoDomain = await client.callTool({
+  name: 'roo_create_shortlink',
+  arguments: { url: 'https://example.com/slug-without-domain-test', custom_domain: { slug: 'should-not-work' } },
+});
+if (slugNoDomain.isError) {
+  console.log('  ✓ tool refused as expected:');
+  for (const b of slugNoDomain.content ?? []) if (b.type === 'text') console.log('    ' + b.text);
+} else {
+  console.log('  ✗ expected an error — validation is not firing!');
+}
+
+console.log('\n=== custom-slug validation: slug with domain=roo.ws should fail tool-side ===');
+const slugOnDefault = await client.callTool({
+  name: 'roo_create_shortlink',
+  arguments: { url: 'https://example.com/slug-on-default-test', custom_domain: { domain: 'roo.ws', slug: 'should-not-work' } },
+});
+if (slugOnDefault.isError) {
+  console.log('  ✓ tool refused as expected:');
+  for (const b of slugOnDefault.content ?? []) if (b.type === 'text') console.log('    ' + b.text);
+} else {
+  console.log('  ✗ expected an error — validation is not firing!');
+}
+
 // ── Padded-id regression: the well-known l.davidzisner.pro/switcheroo shortlink
 // has id `bC5kYXZpZHppc25lci5wcm8vc3dpdGNoZXJvbw==` — trailing `==`. Before the
 // encodeRooId fix, every call on this id 404'd because encodeURIComponent turned

@@ -6,6 +6,32 @@ An MCP server that lets any MCP-capable AI client (Claude Desktop, Claude Code, 
 
 ---
 
+## Fast path: Claude Code plugin (one command)
+
+If you're on **Claude Code** (the CLI), skip the manual config and install as a plugin — it bundles both the MCP server and a companion skill in one step:
+
+```bash
+claude plugin add https://github.com/roo-bz/roo-mcp.git
+```
+
+Then set your API key as a persistent env var (once per machine):
+
+```powershell
+# Windows PowerShell
+[Environment]::SetEnvironmentVariable('ROO_API_KEY', 'your-roo-api-key', 'User')
+```
+
+```bash
+# macOS / Linux
+export ROO_API_KEY=your-roo-api-key       # add to ~/.zshrc or ~/.bashrc
+```
+
+Restart your terminal, then relaunch Claude Code. Type `/mcp` to confirm `roo` is connected. Done — skip the rest of this file.
+
+For **Claude Desktop, Cursor, Continue.dev, or any other MCP client** (which don't have `claude plugin add`), continue with the manual config below.
+
+---
+
 ## Hand-off note for Claude / Claude Code
 
 If a user hands you this file and asks you to set them up, follow the steps below in order. You can do everything except:

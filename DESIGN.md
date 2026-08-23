@@ -173,7 +173,7 @@ Progressive disclosure: the name + description are always in context; the SKILL.
 
 ### B2. SKILL.md frontmatter
 
-The description is the trigger. Claude tends to under-trigger skills, so make it explicit and slightly pushy — state both what it does and the contexts that should invoke it. See the revised `SKILL.md` in this repo for the current draft.
+The description is the trigger. Claude tends to under-trigger skills, so make it explicit and slightly pushy — state both what it does and the contexts that should invoke it. See `skills/roo-shortlinks/SKILL.md` in this repo for the current draft.
 
 ### B3. SKILL.md body outline
 

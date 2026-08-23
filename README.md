@@ -8,7 +8,31 @@ MCP server for [Roo](https://roo.bz) — the smart-shortlink API. Exposes Roo's 
 
 ## Install
 
-Add to your MCP client config (Claude Desktop, Claude Code, etc.):
+### Option A — Claude Code plugin (one command; ships MCP + skill together)
+
+```bash
+claude plugin add https://github.com/roo-bz/roo-mcp.git
+```
+
+Then set your API key once as a user environment variable so the spawned server inherits it:
+
+```powershell
+# Windows PowerShell
+[Environment]::SetEnvironmentVariable('ROO_API_KEY', 'your-roo-api-key', 'User')
+```
+
+```bash
+# macOS / Linux — in ~/.zshrc or ~/.bashrc
+export ROO_API_KEY=your-roo-api-key
+```
+
+Restart your terminal + Claude Code. You get both:
+- The 14 `roo_*` tools (via the MCP server declared in `.mcp.json`).
+- The `roo-shortlinks` skill (in `skills/roo-shortlinks/`) that teaches Claude when to reach for which add-on.
+
+### Option B — Manual MCP config (Claude Desktop, Cursor, Continue.dev, other MCP clients)
+
+Add to your MCP client config file:
 
 ```json
 {
@@ -22,7 +46,7 @@ Add to your MCP client config (Claude Desktop, Claude Code, etc.):
 }
 ```
 
-Get a key from https://roo.bz — see your account API settings.
+See [SETUP.md](./SETUP.md) for the exact config file path per client. Get an API key from https://roo.bz — see your account API settings.
 
 ## Local development
 
@@ -50,6 +74,6 @@ If neither is present, the server exits with a clear error.
 ## Design & spec
 
 - `DESIGN.md` — build brief (tool catalog, architecture, error handling).
-- `SKILL.md` — companion Claude skill (judgment layer).
+- `skills/roo-shortlinks/SKILL.md` — companion Claude skill (judgment layer), bundled with the plugin.
 - `SPEC-NOTES.md` — spec-vs-reality findings from live probes.
 - `roo-openapi.json` — the extracted Swagger 2.0 spec.

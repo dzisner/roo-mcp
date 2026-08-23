@@ -158,6 +158,17 @@ Actual response shape:
 
 **Case-sensitive gotcha**: write path uses `customDomain` (lowercase c). Read path returns `CustomDomain` (uppercase). MCP tools should normalize this in the client.
 
+### Custom slugs require a customer-owned custom domain
+
+Roo's shared default domains (`roo.ws`, `roo.bz`) do NOT accept user-supplied slugs. Only the account's own verified custom domains do (see `roo_list_custom_domains` for the authoritative list). Two failure modes worth knowing:
+
+- **`customDomain: { slug: "foo" }` with no `domain`** — Roo silently accepts the request but **ignores the slug** and creates the shortlink on `roo.ws` with a random 8-char slug. The response reports the random slug without any warning. This is the trap the client used to fall into.
+- **`customDomain: { domain: "roo.ws", slug: "foo" }` explicit** — Roo returns `"Custom Domain doesn't exist."` (HTTP 4xx). The API treats `roo.ws` and `roo.bz` as not being "custom domains" from an ownership standpoint, even though they're the domains links get placed on.
+
+Client-side (in `toWireCustomDomain`) both cases now throw a `RooError('validation')` before any HTTP call is made, with a message pointing at `roo_list_custom_domains`. Never pass `slug` without an explicit `domain` set to an actual custom domain from the account.
+
+Verified 2026-08-23 on a Hop account with `l.davidzisner.pro` as the only custom domain: slugs work on `l.davidzisner.pro` but no combination of slug + `roo.ws`/`roo.bz` succeeds.
+
 ### Do NOT URL-encode `=` when a shortlink id is used in a path
 
 Roo mints shortlink ids as `base64(host + "/" + slug)`. When `len(host) + 1 + len(slug)` is not divisible by 3 (i.e. most of the time), the base64 includes trailing `=` padding — e.g. the id `bC5kYXZpZHppc25lci5wcm8vc3dpdGNoZXJvbw==` for `l.davidzisner.pro/switcheroo`.

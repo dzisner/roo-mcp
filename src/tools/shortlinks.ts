@@ -639,6 +639,26 @@ function toWireCustomDomain(
   input?: { domain?: string | undefined; slug?: string | undefined; alternative_slug?: boolean | undefined } | undefined,
 ): { domain?: string; slug?: string; alternativeSlug?: boolean } | undefined {
   if (!input) return undefined;
+
+  // Custom slugs are only supported on customer-owned custom domains — Roo's shared
+  // defaults (roo.ws, roo.bz) reject them. Slug without domain silently no-ops on
+  // Roo's side (the link is created but with a random slug). Fail fast client-side
+  // with a message that tells the caller how to fix it. Verified 2026-08-23:
+  // `{ domain: "roo.ws", slug: "foo" }` → "Custom Domain doesn't exist."
+  // `{ slug: "foo" }` (no domain) → silent random-slug fallback.
+  if (input.slug !== undefined && input.domain === undefined) {
+    throw new RooError(
+      'validation',
+      'Custom slugs are only supported on a custom domain. Provide `custom_domain.domain` (e.g. your verified domain from roo_list_custom_domains) alongside `slug`, or omit `slug` to accept a random slug on the default roo.ws domain.',
+    );
+  }
+  if (input.domain !== undefined && isRooDefault(input.domain) && input.slug !== undefined) {
+    throw new RooError(
+      'validation',
+      `Cannot set a custom slug on \`${input.domain}\` — that's a Roo-owned default domain, not a custom one. Custom slugs require the account's own custom domain (see roo_list_custom_domains). Omit \`custom_domain\` entirely to get a random slug on roo.ws.`,
+    );
+  }
+
   const out: { domain?: string; slug?: string; alternativeSlug?: boolean } = {};
   if (input.domain !== undefined) out.domain = input.domain;
   if (input.slug !== undefined) out.slug = input.slug;

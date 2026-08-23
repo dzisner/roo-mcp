@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "roo": {
+      "command": "npx",
+      "args": ["-y", "@roo-bz/roo-mcp"]
+    }
+  }
+}

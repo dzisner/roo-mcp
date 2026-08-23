@@ -1,0 +1,19 @@
+{
+  "name": "roo",
+  "description": "Roo shortlinks in Claude — create, configure, and manage roo.bz smart shortlinks with every add-on (scheduled and click-count redirects, click webhooks, preview links, QR codes). Bundles the roo-mcp server plus the roo-shortlinks skill so Claude picks the right tool and constructs correct payloads.",
+  "version": "0.1.0",
+  "keywords": [
+    "roo",
+    "roo.bz",
+    "shortlinks",
+    "shortener",
+    "mcp",
+    "qr",
+    "webhook"
+  ],
+  "author": {
+    "name": "David Zisner",
+    "email": "support@roo.bz"
+  },
+  "homepage": "https://github.com/roo-bz/roo-mcp"
+}

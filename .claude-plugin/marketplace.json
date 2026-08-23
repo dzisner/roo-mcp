@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "roo",
+  "description": "Roo shortlinks for Claude — single-plugin marketplace shipping the roo plugin (MCP server + skills).",
+  "owner": {
+    "name": "David Zisner",
+    "email": "support@roo.bz"
+  },
+  "plugins": [
+    {
+      "name": "roo",
+      "description": "Roo shortlinks in Claude — create, configure, and manage roo.bz smart shortlinks with every add-on (scheduled and click-count redirects, click webhooks, preview links, QR codes). Bundles the roo-mcp MCP server plus the roo-shortlinks skill and a /roo:setup slash command.",
+      "category": "productivity",
+      "source": "./",
+      "homepage": "https://github.com/roo-bz/roo-mcp"
+    }
+  ]
+}

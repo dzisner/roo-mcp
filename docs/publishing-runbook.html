@@ -1,0 +1,653 @@
+<title>roo-mcp — publishing runbook</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --paper: #FAFAF7;
+    --paper-2: #F2F3EE;
+    --ink: #0F1512;
+    --ink-2: #3A4440;
+    --muted: #6E7A73;
+    --rule: #E1E5DD;
+    --accent: #3AA679;
+    --accent-soft: #E4F1EA;
+    --warn: #B84A2F;
+    --warn-soft: #F6E7DF;
+    --code-bg: #141814;
+    --code-ink: #E5EAE3;
+    --code-comment: #6E7A73;
+
+    --mono: ui-monospace, "Cascadia Mono", "SF Mono", Menlo, Consolas, "Roboto Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #0D110F;
+      --paper-2: #151A17;
+      --ink: #E8ECE6;
+      --ink-2: #B0B8B3;
+      --muted: #7A857F;
+      --rule: #232823;
+      --accent: #58CB96;
+      --accent-soft: #14231C;
+      --warn: #E27A5A;
+      --warn-soft: #241612;
+      --code-bg: #080B09;
+      --code-ink: #E5EAE3;
+      --code-comment: #6E7A73;
+    }
+  }
+  :root[data-theme="light"] {
+    --paper: #FAFAF7;
+    --paper-2: #F2F3EE;
+    --ink: #0F1512;
+    --ink-2: #3A4440;
+    --muted: #6E7A73;
+    --rule: #E1E5DD;
+    --accent: #3AA679;
+    --accent-soft: #E4F1EA;
+    --warn: #B84A2F;
+    --warn-soft: #F6E7DF;
+    --code-bg: #141814;
+    --code-ink: #E5EAE3;
+    --code-comment: #6E7A73;
+  }
+  :root[data-theme="dark"] {
+    --paper: #0D110F;
+    --paper-2: #151A17;
+    --ink: #E8ECE6;
+    --ink-2: #B0B8B3;
+    --muted: #7A857F;
+    --rule: #232823;
+    --accent: #58CB96;
+    --accent-soft: #14231C;
+    --warn: #E27A5A;
+    --warn-soft: #241612;
+    --code-bg: #080B09;
+    --code-ink: #E5EAE3;
+    --code-comment: #6E7A73;
+  }
+
+  html { background: var(--paper); color: var(--ink); font-family: var(--sans); }
+  body {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 4rem 1.5rem 6rem;
+    font-size: 16px;
+    line-height: 1.6;
+    font-family: var(--sans);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── typography ─────────────────────────────────────────── */
+  h1, h2, h3, .eyebrow, .stepnum, code, pre, kbd {
+    font-family: var(--mono);
+  }
+  h1 {
+    font-size: 1.75rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0 0 0.4rem;
+  }
+  h2 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    margin: 0;
+    color: var(--ink);
+  }
+  h3 {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0 0 0.4rem;
+    color: var(--ink);
+  }
+  p { margin: 0; color: var(--ink-2); }
+  p + p { margin-top: 0.7rem; }
+  a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid var(--accent);
+    padding-bottom: 1px;
+  }
+  a:hover { background: var(--accent-soft); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+  strong { color: var(--ink); font-weight: 600; }
+  ul { margin: 0.4rem 0 0; padding-left: 1.25rem; color: var(--ink-2); }
+  li + li { margin-top: 0.35rem; }
+
+  .eyebrow {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  /* ── page header ────────────────────────────────────────── */
+  header.doc {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding-bottom: 2rem;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 2.5rem;
+  }
+  header.doc .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-top: 0.4rem;
+  }
+  header.doc .meta span {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.35rem;
+  }
+  header.doc .meta b {
+    color: var(--ink-2);
+    font-weight: 500;
+  }
+
+  /* ── table of contents ─────────────────────────────────── */
+  nav.toc {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 1rem 1.25rem;
+    margin-bottom: 3rem;
+    background: var(--paper-2);
+    border-radius: 4px;
+  }
+  nav.toc .eyebrow { margin-bottom: 0.2rem; }
+  nav.toc ol {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.25rem 1.5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+    counter-reset: toc;
+  }
+  nav.toc li {
+    counter-increment: toc;
+    display: flex;
+    gap: 0.6rem;
+    align-items: baseline;
+  }
+  nav.toc li::before {
+    content: counter(toc, decimal-leading-zero);
+    color: var(--accent);
+    font-size: 0.75rem;
+  }
+  nav.toc a {
+    color: var(--ink-2);
+    border-bottom: none;
+    padding: 0;
+  }
+  nav.toc a:hover {
+    background: transparent;
+    color: var(--accent);
+  }
+  @media (max-width: 520px) {
+    nav.toc ol { grid-template-columns: 1fr; }
+  }
+
+  /* ── sections ───────────────────────────────────────────── */
+  section {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 3.5rem;
+    scroll-margin-top: 2rem;
+  }
+  section > h2 {
+    display: flex;
+    align-items: baseline;
+    gap: 0.8rem;
+  }
+  section > h2::before {
+    content: attr(data-num);
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.05em;
+  }
+  section > h2 + p {
+    color: var(--muted);
+    font-size: 0.92rem;
+    margin-top: -0.4rem;
+  }
+
+  /* ── step blocks (numbered sub-items inside a section) ── */
+  ol.steps {
+    counter-reset: step;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin: 0.5rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  ol.steps > li {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 2rem 1fr;
+    gap: 0.75rem;
+    align-items: start;
+  }
+  ol.steps > li::before {
+    content: counter(step, decimal-leading-zero);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+    padding-top: 0.35rem;
+    letter-spacing: 0.03em;
+  }
+  ol.steps > li > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    min-width: 0;
+  }
+
+  /* ── code ───────────────────────────────────────────────── */
+  code:not(pre code) {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    padding: 0.05em 0.35em;
+    background: var(--paper-2);
+    border-radius: 3px;
+    color: var(--ink);
+    word-break: break-word;
+  }
+  pre {
+    margin: 0;
+    padding: 0.85rem 1rem;
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 5px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 0.83rem;
+    line-height: 1.6;
+    tab-size: 2;
+  }
+  pre code {
+    background: transparent;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+  }
+  pre .c { color: var(--code-comment); font-style: italic; }
+  pre .p { color: var(--accent); }  /* prompt sigil */
+
+  /* ── callouts ───────────────────────────────────────────── */
+  aside.note, aside.warn {
+    padding: 0.8rem 1rem 0.8rem 1.1rem;
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    border-radius: 0 4px 4px 0;
+    font-size: 0.9rem;
+    color: var(--ink-2);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  aside.warn {
+    border-left-color: var(--warn);
+    background: var(--warn-soft);
+  }
+  aside.note .label, aside.warn .label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  aside.warn .label { color: var(--warn); }
+  aside p { color: inherit; }
+  aside code:not(pre code) { background: rgba(0,0,0,0.06); }
+  @media (prefers-color-scheme: dark) {
+    aside code:not(pre code) { background: rgba(255,255,255,0.06); }
+  }
+  :root[data-theme="light"] aside code:not(pre code) { background: rgba(0,0,0,0.06); }
+  :root[data-theme="dark"] aside code:not(pre code) { background: rgba(255,255,255,0.06); }
+
+  /* ── semver table ──────────────────────────────────────── */
+  table.semver {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    margin-top: 0.4rem;
+  }
+  table.semver th, table.semver td {
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+  }
+  table.semver th {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--rule);
+  }
+  table.semver td:first-child, table.semver th:first-child {
+    font-family: var(--mono);
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    width: 5rem;
+  }
+  table.semver code:not(pre code) { font-size: 0.82em; }
+
+  footer.doc {
+    margin-top: 5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.8rem 1.5rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+</style>
+
+<header class="doc">
+  <p class="eyebrow">Publishing runbook</p>
+  <h1>roo-mcp</h1>
+  <p>Operator's guide for shipping releases of the Roo shortlink MCP server to npm. Not intended for end users — for that see the README.</p>
+  <p class="meta">
+    <span><b>Package</b> roo-mcp</span>
+    <span><b>Registry</b> npmjs.com</span>
+    <span><b>Repo</b> C:\Users\User\Roo MCP</span>
+    <span><b>Node</b> ≥ 18</span>
+  </p>
+</header>
+
+<nav class="toc" aria-label="Contents">
+  <p class="eyebrow">Contents</p>
+  <ol>
+    <li><a href="#setup">One-time setup</a></li>
+    <li><a href="#release">Release a version</a></li>
+    <li><a href="#semver">Versioning policy</a></li>
+    <li><a href="#verify">Verify a release</a></li>
+    <li><a href="#dogfood">Dogfood after publish</a></li>
+    <li><a href="#rollback">Roll back a bad release</a></li>
+    <li><a href="#automation">Future: automate with CI</a></li>
+  </ol>
+</nav>
+
+<!-- ─── 1 · one-time setup ─────────────────────────────────── -->
+<section id="setup">
+  <h2 data-num="01 /">One-time setup</h2>
+  <p>Done once per operator machine. Skip this section on subsequent releases.</p>
+
+  <ol class="steps">
+    <li><div>
+      <h3>npm account</h3>
+      <p>Create at <a href="https://www.npmjs.com/signup">npmjs.com/signup</a>. Consider enabling 2FA in your npm settings; it applies to <code>npm publish</code> too and prevents accidental releases from a compromised session.</p>
+    </div></li>
+
+    <li><div>
+      <h3>Log in from this machine</h3>
+<pre><span class="p">&gt;</span> npm login</pre>
+      <p>Opens a browser for OAuth. Verify with:</p>
+<pre><span class="p">&gt;</span> npm whoami
+<span class="c"># → your-npm-username</span></pre>
+    </div></li>
+
+    <li><div>
+      <h3>Git identity</h3>
+      <p>Required for the release commit. Set once, globally:</p>
+<pre><span class="p">&gt;</span> git config --global user.name  <span class="c">"Your Name"</span>
+<span class="p">&gt;</span> git config --global user.email <span class="c">"you@example.com"</span></pre>
+    </div></li>
+
+    <li><div>
+      <h3>GitHub remote</h3>
+      <p>The repo already exists locally. Point it at the GitHub URL and push the initial commit:</p>
+<pre><span class="p">&gt;</span> git remote add origin https://github.com/&lt;you&gt;/roo-mcp.git
+<span class="p">&gt;</span> git push -u origin main</pre>
+    </div></li>
+  </ol>
+</section>
+
+<!-- ─── 2 · release a version ──────────────────────────────── -->
+<section id="release">
+  <h2 data-num="02 /">Release a version</h2>
+  <p>The full cycle for every release, small or large. Runs in ~1 minute end-to-end.</p>
+
+  <ol class="steps">
+    <li><div>
+      <h3>Preflight — nothing uncommitted, tests green</h3>
+<pre><span class="p">&gt;</span> git status                    <span class="c"># must be clean</span>
+<span class="p">&gt;</span> npm run typecheck             <span class="c"># zero errors</span>
+<span class="p">&gt;</span> node scripts/verify-har-fixture.mjs   <span class="c"># SUBSET PASS</span>
+<span class="p">&gt;</span> node scripts/smoke.mjs        <span class="c"># every tool, real API</span></pre>
+      <aside class="note">
+        <span class="label">Why smoke</span>
+        <p>The <code>prepublishOnly</code> hook only runs typecheck + build. It does NOT hit Roo's API. Skip smoke at your peril: it's the only automated check that the tools actually work end-to-end.</p>
+      </aside>
+    </div></li>
+
+    <li><div>
+      <h3>Preview what will ship</h3>
+<pre><span class="p">&gt;</span> npm publish --dry-run</pre>
+      <p>Confirms the tarball contents (LICENSE, README.md, and everything under <code>dist/</code>) and that the version is what you expect. No writes to the registry.</p>
+    </div></li>
+
+    <li><div>
+      <h3>Bump the version</h3>
+      <p>Use the right bump for the change (see <a href="#semver">Versioning policy</a>):</p>
+<pre><span class="p">&gt;</span> npm version patch     <span class="c"># 0.1.0 → 0.1.1</span>
+<span class="p">&gt;</span> npm version minor     <span class="c"># 0.1.0 → 0.2.0</span>
+<span class="p">&gt;</span> npm version major     <span class="c"># 0.1.0 → 1.0.0</span></pre>
+      <p>This edits <code>package.json</code>, commits the bump, and creates a matching <code>vX.Y.Z</code> git tag.</p>
+    </div></li>
+
+    <li><div>
+      <h3>Publish</h3>
+<pre><span class="p">&gt;</span> npm publish</pre>
+      <p>The <code>prepublishOnly</code> hook runs typecheck + build automatically. If either fails the publish aborts before anything reaches the registry.</p>
+    </div></li>
+
+    <li><div>
+      <h3>Push the tag</h3>
+<pre><span class="p">&gt;</span> git push
+<span class="p">&gt;</span> git push --tags</pre>
+    </div></li>
+  </ol>
+</section>
+
+<!-- ─── 3 · semver ─────────────────────────────────────────── -->
+<section id="semver">
+  <h2 data-num="03 /">Versioning policy</h2>
+  <p>The tool interface is the public contract. Model names, input field names, and output field names decide the bump — internal refactors don't.</p>
+
+  <table class="semver">
+    <thead>
+      <tr><th>Bump</th><th>When</th><th>Examples</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>MAJOR</td>
+        <td>Any change that breaks a caller who upgraded blindly.</td>
+        <td>Renaming a tool (<code>roo_set_smart_redirect</code> → <code>roo_set_click_count_redirect</code>), removing a required input field, changing a response field's type.</td>
+      </tr>
+      <tr>
+        <td>MINOR</td>
+        <td>Additive changes — new capability, existing callers unaffected.</td>
+        <td>A new tool. A new optional input field. A new field in a response object.</td>
+      </tr>
+      <tr>
+        <td>PATCH</td>
+        <td>Behavior-preserving fixes.</td>
+        <td>The <code>encodeRooId</code> padded-id fix. A tightened error message. A dependency bump with no interface change.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <aside class="note">
+    <span class="label">Pre-1.0 caveat</span>
+    <p>While the version is <code>0.x.y</code>, callers should expect that a MINOR bump may still contain a small breaking change if experience forces one. Once you're confident the tool surface is stable, ship <code>1.0.0</code> and treat the contract strictly from there.</p>
+  </aside>
+</section>
+
+<!-- ─── 4 · verify ─────────────────────────────────────────── -->
+<section id="verify">
+  <h2 data-num="04 /">Verify a release</h2>
+  <p>Within a minute of <code>npm publish</code> the new version is fetchable. Confirm before telling anyone.</p>
+
+  <ol class="steps">
+    <li><div>
+      <h3>Registry sees the new version</h3>
+<pre><span class="p">&gt;</span> npm view roo-mcp version
+<span class="c"># → 0.1.1  (or whatever you just published)</span></pre>
+    </div></li>
+
+    <li><div>
+      <h3>A fresh <code>npx</code> install actually runs</h3>
+<pre><span class="p">&gt;</span> npx --yes roo-mcp@0.1.1
+<span class="c"># exits with "ROO_API_KEY is not set" — that's success</span></pre>
+      <p>Reaching the "key not set" message means npm found the tarball, downloaded it, and Node loaded <code>dist/index.js</code>. Any other failure — 404, module-not-found, syntax error — means the release is broken and needs a rollback.</p>
+    </div></li>
+  </ol>
+</section>
+
+<!-- ─── 5 · dogfood ────────────────────────────────────────── -->
+<section id="dogfood">
+  <h2 data-num="05 /">Dogfood after publish</h2>
+  <p>Point your own Claude clients at the published version instead of the local build. Catches any "works on my machine" bugs before users see them.</p>
+
+  <ol class="steps">
+    <li><div>
+      <h3>Update Claude Desktop config</h3>
+      <p>Edit <code>%APPDATA%\Claude\claude_desktop_config.json</code> — swap the <code>"command"</code>/<code>"args"</code> pair:</p>
+<pre><span class="c">// before — local dev build</span>
+"roo": {
+  "command": "node",
+  "args": ["C:\\Users\\User\\Roo MCP\\dist\\index.js"]
+}
+
+<span class="c">// after — installed from npm</span>
+"roo": {
+  "command": "npx",
+  "args": ["-y", "roo-mcp"],
+  "env": { "ROO_API_KEY": "your-key" }
+}</pre>
+    </div></li>
+
+    <li><div>
+      <h3>Same swap for Claude Code</h3>
+      <p>Edit <code>~/.claude.json</code>, same JSON pattern under top-level <code>mcpServers.roo</code>.</p>
+    </div></li>
+
+    <li><div>
+      <h3>Fully quit and relaunch</h3>
+      <p>MCP servers are spawned at client startup — a new chat inside a running app won't pick up the change. Right-click tray → Quit for Desktop, or exit and re-launch <code>claude</code> for the CLI.</p>
+    </div></li>
+
+    <li><div>
+      <h3>Sanity-check in a chat</h3>
+      <p>Ask <em>"check my Roo account"</em>. If <code>roo_whoami</code> returns the expected projection, the published tarball is running end-to-end.</p>
+    </div></li>
+  </ol>
+</section>
+
+<!-- ─── 6 · rollback ───────────────────────────────────────── -->
+<section id="rollback">
+  <h2 data-num="06 /">Roll back a bad release</h2>
+  <p>If the release is broken, the right move is almost always <b>deprecate + patch forward</b>, not unpublish.</p>
+
+  <aside class="warn">
+    <span class="label">Never <code>npm unpublish</code> a released version</span>
+    <p>npm allows it only within 72 hours, breaks the installs of anyone who already downloaded it, and blocks that exact version number forever. It should be reserved for cases where the tarball contains a leaked secret or credentials.</p>
+  </aside>
+
+  <ol class="steps">
+    <li><div>
+      <h3>Deprecate the bad version</h3>
+<pre><span class="p">&gt;</span> npm deprecate roo-mcp@0.1.1 \
+  <span class="c">"Buggy — please upgrade to 0.1.2+"</span></pre>
+      <p>The tarball stays installable, but every <code>npm install</code>/<code>npx</code> for that version prints the warning message. Users on it will notice; new installs of <code>npx roo-mcp</code> without a pinned version won't pick it up as long as a newer version exists.</p>
+    </div></li>
+
+    <li><div>
+      <h3>Fix the bug on <code>main</code></h3>
+      <p>Land a fix like any other change. Add a smoke or regression test that would have caught it. Merge.</p>
+    </div></li>
+
+    <li><div>
+      <h3>Ship the patch</h3>
+      <p>Run the full release cycle from <a href="#release">§2</a>, bumping PATCH. The deprecation message auto-clears from user experience the moment they're on the new version.</p>
+    </div></li>
+  </ol>
+</section>
+
+<!-- ─── 7 · automation ─────────────────────────────────────── -->
+<section id="automation">
+  <h2 data-num="07 /">Future: automate with CI</h2>
+  <p>Manual publishing is fine at low frequency. Once releases are more than monthly, a GitHub Actions workflow that publishes on tag push is worth ~30 minutes of setup.</p>
+
+  <ol class="steps">
+    <li><div>
+      <h3>Generate an npm automation token</h3>
+      <p>npmjs.com → your avatar → Access Tokens → Generate → <b>Automation</b> (does not require 2FA for CI). Copy the token — it's shown once.</p>
+    </div></li>
+    <li><div>
+      <h3>Add the token as a GitHub secret</h3>
+      <p>GitHub repo → Settings → Secrets and variables → Actions → New repository secret. Name <code>NPM_TOKEN</code>, value the token from step 1.</p>
+    </div></li>
+    <li><div>
+      <h3>Add the workflow</h3>
+      <p>Commit <code>.github/workflows/release.yml</code>:</p>
+<pre><span class="c"># .github/workflows/release.yml</span>
+name: release
+on:
+  push:
+    tags: ['v*']
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}</pre>
+      <p>After this lands, the manual publish workflow shrinks to: bump the version, push the tag, wait for the Action to go green.</p>
+    </div></li>
+  </ol>
+
+  <aside class="note">
+    <span class="label">Trade-off</span>
+    <p>Automation is only a real win once you'd otherwise ship several releases a month. Below that, the manual flow is faster than debugging a broken Action.</p>
+  </aside>
+</section>
+
+<footer class="doc">
+  <span>runbook · roo-mcp</span>
+  <span>lives at <code>docs/publishing-runbook.html</code></span>
+  <span>keep in sync with <code>README.md</code></span>
+</footer>
