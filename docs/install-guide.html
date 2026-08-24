@@ -250,8 +250,34 @@
     outline: 2px solid var(--accent);
     outline-offset: 2px;
   }
-  .os-panel { display: none; }
-  .os-panel.active { display: flex; flex-direction: column; gap: 0.6rem; }
+  .os-panel, .case-panel { display: none; }
+  .os-panel.active, .case-panel.active { display: flex; flex-direction: column; gap: 0.75rem; }
+  .case-toggle button code { background: transparent; padding: 0; font-size: 0.82em; }
+  .hint {
+    font-size: 0.86rem;
+    color: var(--muted);
+    margin-top: 0.2rem !important;
+  }
+  .warn ul.warn-list {
+    margin: 0.5rem 0 0;
+    padding-left: 1.15rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .warn ul.warn-list li { line-height: 1.5; }
+  .warn ul.warn-list code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    padding: 0.05em 0.3em;
+    background: rgba(0,0,0,0.06);
+    border-radius: 3px;
+    color: var(--ink);
+  }
+  :root[data-theme="dark"] .warn ul.warn-list code { background: rgba(255,255,255,0.06); }
+  @media (prefers-color-scheme: dark) {
+    .warn ul.warn-list code { background: rgba(255,255,255,0.06); }
+  }
   .path {
     font-family: var(--mono);
     font-size: 0.85rem;
@@ -521,11 +547,20 @@
   <!-- ─── 4. paste ─── -->
   <article class="step">
     <div>
-      <h2>Paste this into the file</h2>
-      <p>Replace whatever is in the file with the snippet below. Then swap <span class="placeholder">PASTE_YOUR_KEY_HERE</span> with the key you copied in Step 1. Save the file.</p>
-      <div class="snippet">
-        <button class="copy" type="button" onclick="copySnippet(this)">Copy</button>
-<pre><code id="snippet-content">{
+      <h2>Add Roo to the file</h2>
+      <p>The file might already have other tools set up (GitHub, Filesystem, and so on). We're <strong>adding</strong> Roo alongside them, not replacing them. Pick the case that matches what you see in the file:</p>
+
+      <div class="os-toggle case-toggle" role="tablist" aria-label="Choose your case">
+        <button type="button" data-case="empty" aria-pressed="true">File is empty or just <code>{}</code></button>
+        <button type="button" data-case="existing" aria-pressed="false">File already has other tools</button>
+      </div>
+
+      <!-- Case A: empty file -->
+      <div class="case-panel active" data-case-panel="empty">
+        <p>Replace whatever is in the file with this whole block. Then swap <span class="placeholder">PASTE_YOUR_KEY_HERE</span> with the key you copied in Step 1. Save the file.</p>
+        <div class="snippet">
+          <button class="copy" type="button" onclick="copySnippet(this)">Copy</button>
+<pre><code>{
   "mcpServers": {
     "roo": {
       "command": "npx",
@@ -534,9 +569,52 @@
     }
   }
 }</code></pre>
+        </div>
       </div>
+
+      <!-- Case B: file already has other MCP tools -->
+      <div class="case-panel" data-case-panel="existing">
+        <p>Find the <code>mcpServers</code> block that's already in your file. Add the Roo entry inside it, next to your existing tools. <strong>Every entry inside <code>mcpServers</code> needs a comma after it, except the last one.</strong></p>
+
+        <p>Here's what a file looks like before adding Roo:</p>
+        <div class="snippet">
+<pre><code>{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"]
+    }
+  }
+}</code></pre>
+        </div>
+
+        <p>…and after. Notice the <strong>comma after the GitHub entry</strong> and the new Roo block added below it. Swap <span class="placeholder">PASTE_YOUR_KEY_HERE</span> with your key from Step 1, then save.</p>
+        <div class="snippet">
+          <button class="copy" type="button" onclick="copySnippet(this)">Copy Roo entry</button>
+<pre><code>{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"]
+    }<span class="placeholder">,</span>
+    "roo": {
+      "command": "npx",
+      "args": ["-y", "@roo-bz/roo-mcp"],
+      "env": { "ROO_API_KEY": "<span class="placeholder">PASTE_YOUR_KEY_HERE</span>" }
+    }
+  }
+}</code></pre>
+        </div>
+        <p class="hint">The <strong>Copy</strong> button copies just the Roo entry (the part that starts with <code>"roo":</code>). Paste it inside your existing <code>mcpServers</code> braces, and add a comma after the previous entry.</p>
+      </div>
+
       <div class="warn">
-        <span class="label">Watch the quotes</span> Keep the double quotes around your key. Don't add spaces inside them. Common mistakes: pasting a key with quotes already around it (delete the extra ones), or accidentally deleting the closing <code>}</code> at the bottom.
+        <span class="label">Watch out for</span>
+        <ul class="warn-list">
+          <li><strong>Missing or extra commas.</strong> Each entry inside <code>mcpServers</code> needs a comma after it — except the last one.</li>
+          <li><strong>Extra quotes around your key.</strong> Keep exactly the double quotes shown; if your pasted key already has quotes, delete them.</li>
+          <li><strong>Accidentally deleting a closing <code>}</code> or <code>]</code>.</strong> If the file won't save or Claude complains next launch, the file is invalid — try <a href="https://jsonlint.com">jsonlint.com</a> to spot the missing bracket.</li>
+        </ul>
       </div>
     </div>
   </article>
@@ -598,15 +676,33 @@
 
 <script>
   // OS toggle — swaps the visible path/instructions in Step 3
-  const osButtons = document.querySelectorAll('.os-toggle button');
-  const osPanels = document.querySelectorAll('.os-panel');
-  osButtons.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const os = btn.dataset.os;
-      osButtons.forEach((b) => b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'));
-      osPanels.forEach((p) => p.classList.toggle('active', p.dataset.osPanel === os));
+  // Scoped to the specific toggle group so it doesn't confuse the case toggle in Step 4.
+  const osToggle = document.querySelector('.os-toggle:not(.case-toggle)');
+  if (osToggle) {
+    const osButtons = osToggle.querySelectorAll('button');
+    const osPanels = document.querySelectorAll('.os-panel');
+    osButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const os = btn.dataset.os;
+        osButtons.forEach((b) => b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'));
+        osPanels.forEach((p) => p.classList.toggle('active', p.dataset.osPanel === os));
+      });
     });
-  });
+  }
+
+  // Case toggle — swaps the "empty file" vs "existing tools" content in Step 4
+  const caseToggle = document.querySelector('.case-toggle');
+  if (caseToggle) {
+    const caseButtons = caseToggle.querySelectorAll('button');
+    const casePanels = document.querySelectorAll('.case-panel');
+    caseButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const c = btn.dataset.case;
+        caseButtons.forEach((b) => b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'));
+        casePanels.forEach((p) => p.classList.toggle('active', p.dataset.casePanel === c));
+      });
+    });
+  }
 
   // Auto-pick OS on load
   (function () {
@@ -617,12 +713,24 @@
     }
   })();
 
-  // Copy button
+  // Copy button — finds the <code> element in the same .snippet container.
+  // For the "existing tools" case, we copy just the Roo entry, not the full example
+  // (so the user pastes only what they need to add).
   function copySnippet(btn) {
-    const el = document.getElementById('snippet-content');
-    if (!el) return;
-    // Extract text without the highlight styling — replace with the placeholder text
-    const text = el.innerText;
+    const container = btn.closest('.snippet');
+    if (!container) return;
+    const codeEl = container.querySelector('code');
+    if (!codeEl) return;
+
+    let text = codeEl.innerText;
+
+    // If the button label mentions "Roo entry" (Case B, existing-tools case),
+    // extract just the roo block from the full example.
+    if (/roo entry/i.test(btn.textContent)) {
+      const match = text.match(/"roo":\s*\{[\s\S]*?\n\s*\}/);
+      if (match) text = match[0];
+    }
+
     navigator.clipboard.writeText(text).then(() => {
       const original = btn.textContent;
       btn.textContent = 'Copied ✓';
