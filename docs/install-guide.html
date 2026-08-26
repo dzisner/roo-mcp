@@ -308,6 +308,17 @@
     overflow-x: auto;
     tab-size: 2;
   }
+  /* One-liner variant: a single command or path with an inline Copy button. */
+  .snippet.inline pre {
+    padding: 0.55rem 5rem 0.55rem 0.85rem;
+    font-size: 0.86rem;
+    white-space: pre;
+  }
+  .snippet.inline button.copy {
+    top: 0.3rem;
+    padding: 0.25rem 0.6rem;
+    font-size: 0.68rem;
+  }
   .snippet .placeholder {
     background: var(--highlight);
     color: #1A1E1B;
@@ -507,8 +518,9 @@
   <article class="step">
     <div>
       <h2>Make sure Node.js is installed</h2>
-      <p>This is the little runtime Roo uses under the hood. Most people already have it. To check, open your terminal (see Step 3 for how to open it on your OS) and type:</p>
-      <div class="snippet">
+      <p>This is the little runtime Roo uses under the hood. Most people already have it. To check, open your terminal (PowerShell on Windows, Terminal on Mac) and type:</p>
+      <div class="snippet inline">
+        <button class="copy" type="button" onclick="copySnippet(this)">Copy</button>
         <pre><code>node --version</code></pre>
       </div>
       <p>If you see something like <code>v20.11.1</code> or higher, you're set. If you get "not recognized" or "command not found," install it from <a href="https://nodejs.org">nodejs.org</a> — grab the LTS button, run the installer, click through the defaults, then restart your terminal.</p>
@@ -519,27 +531,43 @@
   <article class="step">
     <div>
       <h2>Open Claude Desktop's settings file</h2>
-      <p>This is a small text file where Claude keeps its list of connected tools. We're going to add Roo to it.</p>
+      <p>This is a small text file where Claude keeps its list of connected tools. We're going to add Roo to it. The easiest way works on every platform and every install type:</p>
+
+      <p><strong>Inside Claude Desktop, click:</strong></p>
+      <div class="snippet inline">
+        <button class="copy" type="button" onclick="copySnippet(this)">Copy</button>
+        <pre><code>Settings → Developer → Edit Config</code></pre>
+      </div>
+      <p>That opens <code>claude_desktop_config.json</code> in your default text editor. Skip to Step 4.</p>
+
+      <div class="tip">
+        <span class="label">Don't see "Edit Config"?</span> Some older versions or non-standard installs hide it. Use the manual fallback below for your OS.
+      </div>
 
       <div class="os-toggle" role="tablist" aria-label="Choose your operating system">
-        <button type="button" data-os="mac" aria-pressed="true">macOS</button>
-        <button type="button" data-os="win" aria-pressed="false">Windows</button>
+        <button type="button" data-os="mac" aria-pressed="true">macOS fallback</button>
+        <button type="button" data-os="win" aria-pressed="false">Windows fallback</button>
       </div>
 
       <div class="os-panel active" data-os-panel="mac">
         <p>Open <strong>Finder</strong>, then in the menu bar choose <strong>Go → Go to Folder…</strong> (or press <code>⌘⇧G</code>). Paste this and press Return:</p>
-        <span class="path">~/Library/Application Support/Claude</span>
+        <div class="snippet inline">
+          <button class="copy" type="button" onclick="copySnippet(this)">Copy</button>
+          <pre><code>~/Library/Application Support/Claude</code></pre>
+        </div>
         <p>You should see a file called <code>claude_desktop_config.json</code>. Right-click it and choose <strong>Open With → TextEdit</strong> (or any text editor you like). If the file doesn't exist yet, create a new plain-text file with that exact name and put the two characters <code>{}</code> in it as its content.</p>
       </div>
 
       <div class="os-panel" data-os-panel="win">
         <p>Press <code>Win + R</code> to open the Run box. Paste this and press Enter:</p>
-        <span class="path">%APPDATA%\Claude</span>
+        <div class="snippet inline">
+          <button class="copy" type="button" onclick="copySnippet(this)">Copy</button>
+          <pre><code>%APPDATA%\Claude</code></pre>
+        </div>
         <p>File Explorer opens on the folder. You should see <code>claude_desktop_config.json</code>. Right-click it and choose <strong>Open with → Notepad</strong>. If the file doesn't exist yet, create a new text file with that exact name (including the <code>.json</code> extension) and put the two characters <code>{}</code> in it as its content.</p>
-      </div>
-
-      <div class="tip">
-        <span class="label">Easier route (if you see it)</span> Inside Claude Desktop, open <strong>Settings → Developer → Edit Config</strong>. That opens the same file directly.
+        <div class="warn">
+          <span class="label">If Windows says "cannot find"</span> This means you have the Microsoft Store version of Claude Desktop, which sandboxes its settings folder. The Run-box path doesn't work for Store installs — go back and use the <strong>Settings → Developer → Edit Config</strong> option in the app instead. That works regardless of install type.
+        </div>
       </div>
     </div>
   </article>
@@ -665,16 +693,30 @@
   </details>
 
   <details>
+    <summary>Windows Run box says it can't find <code>%APPDATA%\Claude</code>.</summary>
+    <p>You have the Microsoft Store version of Claude Desktop. Store apps sandbox their settings folder, and Windows Run/Explorer sometimes refuses to open the sandboxed path directly — even though the folder truly exists on disk. Skip the Run box: inside Claude Desktop, use <strong>Settings → Developer → Edit Config</strong>. That opens the real settings file no matter where it's stored.</p>
+  </details>
+
+  <details>
     <summary>My question isn't here.</summary>
-    <p>See the full setup guide at <a href="https://github.com/roo-bz/roo-mcp/blob/main/SETUP.md">github.com/roo-bz/roo-mcp/blob/main/SETUP.md</a>, or open an issue at <a href="https://github.com/roo-bz/roo-mcp/issues">github.com/roo-bz/roo-mcp/issues</a>.</p>
+    <p>See the full setup guide at <a href="https://github.com/dzisner/roo-mcp/blob/main/SETUP.md">github.com/dzisner/roo-mcp/blob/main/SETUP.md</a>, or open an issue at <a href="https://github.com/dzisner/roo-mcp/issues">github.com/dzisner/roo-mcp/issues</a>.</p>
   </details>
 </section>
 
 <footer class="doc">
-  Made for <a href="https://roo.bz">Roo</a> · <a href="https://github.com/roo-bz/roo-mcp">source</a> · works with Claude Desktop, Claude Code, Cursor, and any client that speaks MCP.
+  Made for <a href="https://roo.bz">Roo</a> · <a href="https://github.com/dzisner/roo-mcp">source</a> · works with Claude Desktop, Claude Code, Cursor, and any client that speaks MCP.
 </footer>
 
 <script>
+  // External links open in a new tab, so users don't lose their place in the guide.
+  // Any http(s) link that isn't same-origin gets target=_blank + rel=noopener.
+  document.querySelectorAll('a[href^="http"]').forEach((a) => {
+    if (a.host !== window.location.host) {
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+    }
+  });
+
   // OS toggle — swaps the visible path/instructions in Step 3
   // Scoped to the specific toggle group so it doesn't confuse the case toggle in Step 4.
   const osToggle = document.querySelector('.os-toggle:not(.case-toggle)');
