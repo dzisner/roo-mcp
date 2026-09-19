@@ -1,0 +1,518 @@
+openapi: 3.0.3
+info:
+  title: Roo API
+  version: "1.2"
+  description: |
+    Roo (roo.bz) smart-shortlink API. Shortlinks are the base primitive; add-ons
+    make them time-aware, count-aware, event-emitting, preview-controlled, or
+    scannable via QR. See the Custom GPT's instructions for behavioral guidance
+    (waypoint vs window, custom-slug rules, etc.) — this schema captures shape,
+    not intent.
+
+servers:
+  - url: https://api.roo.bz
+    description: Production
+
+security:
+  - ApiKey: []
+
+components:
+  securitySchemes:
+    ApiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: The user's Roo API key. Get one from https://app.roo.bz → Account Settings → Api Keys.
+
+  schemas:
+    Shortlink:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Destination URL the shortlink redirects to.
+        addOns:
+          type: array
+          description: |
+            Optional list of add-ons to attach at create time. Each entry is
+            { addOn, enabled, data } where data's shape depends on addOn.
+          items:
+            $ref: '#/components/schemas/AddOn'
+        customDomain:
+          $ref: '#/components/schemas/CustomDomain'
+
+    CustomDomain:
+      type: object
+      description: |
+        Attach the shortlink to a specific domain and optionally a chosen slug.
+        IMPORTANT: slug only works if `domain` is one of the account's own
+        verified custom domains (see /v1/account/custom-domains). Slug on
+        `roo.ws` or `roo.bz` (Roo's defaults) is silently ignored — Roo
+        assigns a random slug instead, without error. Omit customDomain
+        entirely to accept a random slug on roo.ws.
+      properties:
+        domain:
+          type: string
+          description: The custom domain host (e.g. "l.example.com"). Must be verified on the account.
+        slug:
+          type: string
+          description: Desired slug (path after the domain). Must be unique on the domain.
+        alternativeSlug:
+          type: boolean
+          description: If true and the requested slug is taken, Roo falls back to a random slug instead of erroring.
+
+    AddOn:
+      type: object
+      required: [addOn, enabled, data]
+      description: |
+        Discriminated by `addOn`. Per-type `data` shapes:
+
+        - scheduledRedirect: { schedule: [{ timestamp: <unix-epoch-seconds>, url }] }
+          Waypoints (not windows) — at time T, switch to url. Before the first waypoint, falls through to the shortlink's base url.
+        - clickCountRedirect: { schedule: [{ clickCount: <int>=1>, url }] }
+          Cumulative — after N total clicks, switch to url.
+        - webhook: { name, method, body(string), contentType, endpoint, addMetadata(bool), headers(obj), queryString(obj) }
+          All 8 fields required. body is a raw string (JSON as a string, not an object).
+        - previewLink: { title, description, image?, image_url? }
+          title/description required. image accepts a base64 data URI (must be ≥ ~100 KB); image_url for previously-returned hosted image.
+        - qrCode: { codeColor(#RRGGBB), backgroundColor(#RRGGBB), qtType(mode_1..mode_9), scale(1..10), logo(base64 or ""), displayRooLogo(bool) }
+          All 6 fields required. Callers should supply sensible defaults if user didn't specify.
+      properties:
+        addOn:
+          type: string
+          enum: [scheduledRedirect, clickCountRedirect, webhook, previewLink, qrCode]
+          description: Type discriminator. Selects the shape of `data`.
+        enabled:
+          type: boolean
+          description: Whether the add-on is active (usually true when setting).
+        data:
+          type: object
+          description: Type-specific payload. See parent description for per-type shapes.
+          additionalProperties: true
+
+    ShortlinkCreated:
+      type: object
+      description: Response of POST /v1/urls.
+      properties:
+        id:
+          type: string
+          description: |
+            Opaque id used in path-based endpoints. Base64 of "<host>/<slug>";
+            may contain trailing `=` padding. When using this id in a URL path,
+            SEND THE `=` RAW — do not URL-encode it to `%3D` (Roo's routing
+            rejects the encoded form).
+        shortUrl:
+          type: string
+          format: uri
+        shortUrlNoProtocol:
+          type: string
+        slug:
+          type: string
+        qrCode:
+          type: object
+          description: Present only when the create request included a qrCode add-on. Pre-rendered image, saves a follow-up call.
+          properties:
+            mimeType: { type: string }
+            base64: { type: string, description: "Full data URI, e.g. data:image/png;base64,..." }
+
+    ShortlinkUpdated:
+      type: object
+      properties:
+        id: { type: string }
+        message: { type: string }
+
+    ShortlinkRecord:
+      type: object
+      description: |
+        Read shape of a shortlink. Case-sensitivity notice: WRITE uses lowercase
+        `customDomain`, READ returns uppercase `CustomDomain`. Same fields.
+      properties:
+        PK:
+          type: string
+          description: Internal DynamoDB key ("URL#<id>"). Strip the "URL#" prefix to get the id.
+        CreatedDate:
+          type: integer
+          format: int64
+          description: Unix epoch seconds.
+        UpdatedDate:
+          type: integer
+          format: int64
+        Attributes:
+          type: object
+          properties:
+            TargetUrl:
+              type: string
+              description: The destination URL.
+            Permanent:
+              type: boolean
+              description: If true, the link opts out of the plan's auto-expiry.
+            UserId:
+              type: string
+        Counter:
+          type: integer
+          description: Total click count.
+        FolderId:
+          type: string
+          nullable: true
+        FolderPaths:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              name: { type: string }
+        Description:
+          type: string
+          nullable: true
+        CustomDomain:
+          type: object
+          description: |
+            Present on EVERY shortlink, including default-domain ones where
+            `domain = "roo.ws"`. Does NOT imply a custom domain is attached —
+            use /v1/account/custom-domains to find real custom domains.
+          properties:
+            domain: { type: string }
+            slug: { type: string }
+        addOns:
+          type: array
+          items:
+            $ref: '#/components/schemas/AddOn'
+        shortUrl: { type: string }
+        shortUrlNoProtocol: { type: string }
+        slug: { type: string }
+
+    ShortlinkRecordList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ShortlinkRecord'
+        nextKey:
+          type: string
+          description: Cursor for the next page. Pass back as `lastKey` query param. Absent when no more results.
+
+    PermanentSettingsBody:
+      type: object
+      description: |
+        Body for PATCH /v1/urls/{id}/permanent-shortlink. Only `permanent` is
+        currently verified as effective; other fields may be accepted silently
+        but not persist.
+      properties:
+        permanent:
+          type: boolean
+          description: true to mark permanent; false to remove.
+
+    QrCodeResponse:
+      type: object
+      description: |
+        Response of GET /v1/urls/{id}/qr-code. Note: 404 if the qrCode add-on
+        isn't set on the shortlink first.
+      properties:
+        success: { type: boolean }
+        data:
+          type: object
+          properties:
+            mimeType:
+              type: string
+              example: image/png
+            base64:
+              type: string
+              description: Full data URI, e.g. "data:image/png;base64,iVBORw0KGgo..."
+        message:
+          type: string
+          description: Present on failure (e.g. "QR settings not enabled.").
+
+    CustomDomainRecord:
+      type: object
+      properties:
+        PK:
+          type: string
+          description: DynamoDB key ("DOMAIN#<id>").
+        CreatedDate: { type: integer, format: int64 }
+        UpdatedDate: { type: integer, format: int64 }
+        Status:
+          type: string
+          description: e.g. "Issued" (verified + active), "Pending".
+        Attributes:
+          type: object
+          properties:
+            domain: { type: string }
+            subdomain: { type: string }
+            acm:
+              type: object
+              description: AWS ACM CNAME challenge details for cert validation.
+            cloudfront:
+              type: object
+              description: CloudFront distribution details the customer's DNS should CNAME to.
+
+    CustomDomainsResponse:
+      type: object
+      properties:
+        domains:
+          type: array
+          items:
+            $ref: '#/components/schemas/CustomDomainRecord'
+
+    AccountMe:
+      type: object
+      description: |
+        /v1/me is very large (~52 KB) and returns the raw Stripe subscription
+        object nested inside. Rather than typing everything, this schema
+        documents the useful projected fields the GPT should surface.
+        Full response has many more fields.
+      properties:
+        email: { type: string }
+        createdDate:
+          type: integer
+          format: int64
+          description: Unix epoch milliseconds (unlike most Roo timestamps).
+        subscription:
+          type: object
+          properties:
+            status: { type: string, description: e.g. "active" }
+            startDate: { type: integer, format: int64 }
+            endDate: { type: integer, format: int64 }
+            nextBillingDate: { type: integer, format: int64 }
+            subscriptionInfo:
+              type: object
+              properties:
+                plan:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                      description: e.g. "Hop", "Skip", "Leap", "Spring", "Enterprise"
+                    features:
+                      type: object
+                      description: Per-account effective limits (per-type add-on limits, shortlink monthly cap, custom domain limit, etc.)
+        featuresStatus:
+          type: object
+          description: Boolean map of enabled features on this plan.
+
+paths:
+  /v1/me:
+    get:
+      operationId: getAccount
+      summary: Get the authenticated account
+      description: |
+        Returns account email, plan name, subscription dates, and per-account
+        effective limits. Use this to verify the API key works, tell the user
+        which plan they're on, and read live quota limits (which vary by
+        signup era — do not hardcode plan-tier numbers).
+      responses:
+        '200':
+          description: Account details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountMe'
+
+  /v1/urls:
+    get:
+      operationId: listShortlinks
+      summary: List shortlinks (cursor-paginated)
+      description: |
+        Cursor-paginated. Pass `lastKey` from a prior response's `nextKey` to
+        page. No search parameter — for search, use /v1/urls/search-shortlinks.
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100 }
+        - name: lastKey
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Page of shortlinks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShortlinkRecordList'
+    post:
+      operationId: createShortlink
+      summary: Create a shortlink
+      description: |
+        Create a shortlink with an optional custom-domain/slug binding and
+        optional add-ons attached in the same call (atomic). When the addOns
+        array includes a qrCode entry, the response includes a pre-rendered
+        `qrCode` object with the image inline — no follow-up qr-code call.
+
+        SLUG RULES: `customDomain.slug` only works if `customDomain.domain` is
+        one of the account's own verified custom domains (see
+        /v1/account/custom-domains). Passing slug alone (no domain), or slug
+        with domain=roo.ws/roo.bz, is either silently ignored (random slug
+        assigned) or rejected. Omit customDomain to just get a random slug on
+        roo.ws.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Shortlink'
+      responses:
+        '200':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShortlinkCreated'
+
+  /v1/urls/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: |
+          Shortlink id. Base64 of "<host>/<slug>", may contain trailing `=`
+          padding — send `=` raw in the URL path, do NOT URL-encode to `%3D`.
+    get:
+      operationId: getShortlink
+      summary: Get one shortlink
+      responses:
+        '200':
+          description: Shortlink detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShortlinkRecord'
+    patch:
+      operationId: updateShortlink
+      summary: Update a shortlink
+      description: |
+        Update the destination URL and/or custom-domain binding. To attach
+        or change an add-on, use PATCH /v1/urls/{id}/add-on. To toggle
+        permanence, use PATCH /v1/urls/{id}/permanent-shortlink.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Shortlink'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShortlinkUpdated'
+
+  /v1/urls/{id}/add-on:
+    patch:
+      operationId: setAddOn
+      summary: Set or replace an add-on on a shortlink
+      description: |
+        Attach one add-on (of any of the 5 types) to a shortlink. Setting an
+        add-on of a given type replaces the previous configuration of that
+        type — multiple TYPES can coexist on the same link (one each), but
+        setting webhook twice keeps only the second.
+
+        See AddOn schema for per-type `data` shape and defaults.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddOn'
+      responses:
+        '200':
+          description: Set
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShortlinkUpdated'
+
+  /v1/urls/{id}/permanent-shortlink:
+    patch:
+      operationId: setPermanentSettings
+      summary: Set or update permanent-mode settings
+      description: |
+        Mark a shortlink as permanent (opts out of the plan's auto-expiry —
+        Hop = 90 days) or un-mark it. Body must have `permanent: true` or
+        `false`. Empty-body PATCH is a silent no-op — always send a body.
+
+        DO NOT use PUT /v1/urls/{id}/permanent-shortlink — it's broken
+        server-side (leaks a Node TypeError). PATCH does everything.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PermanentSettingsBody'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShortlinkUpdated'
+
+  /v1/urls/{id}/qr-code:
+    get:
+      operationId: getQrCode
+      summary: Get the QR image for a shortlink
+      description: |
+        Returns the QR image as a base64 data URI inside JSON — NOT raw image
+        bytes. Requires the qrCode add-on to have been configured on the
+        shortlink first (via PATCH /add-on with addOn=qrCode). If not set,
+        returns 404 with `{ success: false, message: "QR settings not enabled." }`.
+
+        Shortcut: if you're creating the shortlink now, include a qrCode
+        add-on in the POST /v1/urls addOns array — the create response
+        includes the pre-rendered QR inline, no separate qr-code call needed.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: QR image (JSON with base64 data URI)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QrCodeResponse'
+        '404':
+          description: qrCode add-on not set on this shortlink
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QrCodeResponse'
+
+  /v1/account/custom-domains:
+    get:
+      operationId: listCustomDomains
+      summary: List custom domains attached to the account
+      description: |
+        The authoritative list. Use this before setting a custom slug — the
+        `slug` field only works on domains returned here. `/v1/me` reports
+        the plan's custom-domain LIMIT but not which domains are attached.
+
+        Note: this endpoint is not in the original Roo OpenAPI but is a
+        stable, real endpoint the Roo web app uses.
+      parameters:
+        - name: filter
+          in: query
+          schema: { type: string }
+          description: Filter by domain Status. e.g. "Issued" for verified+active.
+      responses:
+        '200':
+          description: Attached custom domains
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CustomDomainsResponse'
