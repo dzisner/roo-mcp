@@ -16,3 +16,6 @@ scratchpad/
 
 # Claude Code local project state
 .claude/
+
+# Wrangler (Cloudflare Workers) local cache + build output
+.wrangler/

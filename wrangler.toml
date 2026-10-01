@@ -1,0 +1,9 @@
+name = "roo-mcp"
+main = "src/http/worker.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Custom domain routing — enable after first deploy succeeds.
+# [[routes]]
+# pattern = "mcp.roo.bz/*"
+# custom_domain = true

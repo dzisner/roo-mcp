@@ -44,7 +44,9 @@ export class RooClient {
   constructor(opts: RooClientOptions) {
     this.apiKey = opts.apiKey;
     this.baseUrl = opts.baseUrl ?? DEFAULT_BASE_URL;
-    this.fetchImpl = opts.fetch ?? fetch;
+    // Bind to globalThis so storing the global `fetch` as a property doesn't strip its receiver.
+    // Required on Cloudflare Workers (otherwise: "Illegal invocation: function called with incorrect `this` reference").
+    this.fetchImpl = opts.fetch ?? fetch.bind(globalThis);
   }
 
   async request<T = unknown>(method: HttpMethod, path: string, body?: unknown): Promise<T> {
