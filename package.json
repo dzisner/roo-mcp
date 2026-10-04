@@ -16,7 +16,9 @@
   "scripts": {
     "build": "tsc",
     "start": "node ./dist/index.js",
+    "start:http": "node ./dist/http/node-server.js",
     "dev": "tsx ./src/index.ts",
+    "dev:http": "tsx ./src/http/node-server.ts",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run typecheck && npm run build"
   },
@@ -53,10 +55,8 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261001.1",
     "@types/node": "^26.1.0",
     "tsx": "^4.22.5",
-    "typescript": "^6.0.3",
-    "wrangler": "^4.145.0"
+    "typescript": "^6.0.3"
   }
 }
