@@ -55,7 +55,9 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/aws-lambda": "^8.10.164",
     "@types/node": "^26.1.0",
+    "esbuild": "^0.28.2",
     "tsx": "^4.22.5",
     "typescript": "^6.0.3"
   }

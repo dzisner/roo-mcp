@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Roo MCP HTTP endpoint (mcp.roo.bz) — Lambda + HTTP API
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: mcp.roo.bz
+    Description: Custom domain served by this API.
+  CertificateArn:
+    Type: String
+    Description: ARN of an ACM certificate for DomainName, in the SAME region as this stack.
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    MemorySize: 256
+    Timeout: 29      # API Gateway HTTP API hard-caps at 30s; stay just under.
+    Architectures: [arm64]
+    LoggingConfig:
+      LogFormat: JSON
+
+Resources:
+  RooMcpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      Domain:
+        DomainName: !Ref DomainName
+        CertificateArn: !Ref CertificateArn
+        EndpointConfiguration: REGIONAL
+        SecurityPolicy: TLS_1_2
+      DisableExecuteApiEndpoint: false   # keep the *.execute-api.* URL for pre-DNS testing
+
+  RooMcpFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: lambda.handler
+      Description: Thin MCP wrapper. Stateless, per-request, passes caller's x-api-key to api.roo.bz.
+      Events:
+        Default:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref RooMcpApi
+            Path: /{proxy+}
+            Method: ANY
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Target: node22
+        Format: esm
+        Minify: false
+        Sourcemap: true
+        EntryPoints:
+          - src/http/lambda.ts
+        OutExtension:
+          - .js=.mjs
+        # Lambda ESM has no top-level `require`; shim one for any CJS dep that reaches for it.
+        Banner:
+          js: "import{createRequire}from'node:module';const require=createRequire(import.meta.url);"
+
+Outputs:
+  CustomDomain:
+    Description: Hit this once DNS is in place.
+    Value: !Sub 'https://${DomainName}/mcp'
+  DefaultApiEndpoint:
+    Description: Use this for pre-DNS smoke tests. Append /mcp.
+    Value: !Sub 'https://${RooMcpApi}.execute-api.${AWS::Region}.amazonaws.com'
+  RegionalDomainTarget:
+    Description: Create a DNS CNAME at mcp.roo.bz pointing to this value.
+    Value: !GetAtt RooMcpApi.DomainName.RegionalDomainName
+  HostedZoneIdForAlias:
+    Description: If using Route 53 ALIAS instead of CNAME, use this hosted zone.
+    Value: !GetAtt RooMcpApi.DomainName.RegionalHostedZoneId

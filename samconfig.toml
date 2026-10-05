@@ -1,0 +1,15 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "roo-mcp"
+resolve_s3 = true                 # SAM manages the artifact bucket for us
+s3_prefix = "roo-mcp"
+region = "us-east-1"              # override via --region if the account standardizes elsewhere
+confirm_changeset = false
+capabilities = "CAPABILITY_IAM"
+disable_rollback = false
+# parameter_overrides is supplied by the GitHub Actions workflow (needs the cert ARN).
+
+[default.build.parameters]
+cached = true
+parallel = true

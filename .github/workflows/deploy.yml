@@ -1,0 +1,85 @@
+name: Deploy MCP (Lambda + HTTP API)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'template.yaml'
+      - 'samconfig.toml'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # for OIDC assume-role
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      CERTIFICATE_ARN: ${{ vars.CERTIFICATE_ARN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build (tsc, for the stdio package)
+        run: npm run build
+
+      - name: SAM build (bundles the Lambda via esbuild)
+        run: sam build
+
+      - name: SAM deploy
+        run: |
+          sam deploy \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --region "$AWS_REGION" \
+            --parameter-overrides "CertificateArn=$CERTIFICATE_ARN"
+
+      - name: Describe outputs
+        run: |
+          aws cloudformation describe-stacks \
+            --stack-name roo-mcp \
+            --region "$AWS_REGION" \
+            --query 'Stacks[0].Outputs' \
+            --output table
+
+  smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: ${{ vars.SMOKE_TEST_URL != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Smoke test
+        env:
+          ROO_API_KEY: ${{ secrets.ROO_SMOKE_API_KEY }}
+        run: |
+          chmod +x scripts/smoke-http.sh
+          bash scripts/smoke-http.sh "${{ vars.SMOKE_TEST_URL }}"
