@@ -476,7 +476,7 @@
   <h2>Before you start, you'll need</h2>
   <ul>
     <li>An account on <a href="https://app.roo.bz">app.roo.bz</a> — the free "Hop" plan works fine.</li>
-    <li><strong>Claude Code</strong> (the terminal tool) <strong>or</strong> <strong>Claude Desktop</strong> (the Mac/Windows app).</li>
+    <li>Claude running <strong>in your terminal</strong>, <strong>or</strong> the <strong>Claude Desktop</strong> app.</li>
   </ul>
 </section>
 
@@ -500,8 +500,8 @@
       <p>Pick the Claude you use:</p>
 
       <div class="client-toggle" role="tablist" aria-label="Choose your Claude">
-        <button type="button" data-client="cli" aria-pressed="true">Claude Code (terminal)</button>
-        <button type="button" data-client="desktop" aria-pressed="false">Claude Desktop (app)</button>
+        <button type="button" data-client="cli" aria-pressed="true">Terminal</button>
+        <button type="button" data-client="desktop" aria-pressed="false">Desktop app</button>
       </div>
 
       <!-- CLI panel -->
@@ -520,7 +520,7 @@
         </div>
         <p>You should see <code>roo</code> in the list with a <strong>Connected</strong> status.</p>
         <div class="tip">
-          <span class="label">Don't have Claude Code yet?</span> Install it with the one-liner at <a href="https://docs.claude.com/en/docs/claude-code/overview">docs.claude.com/en/docs/claude-code/overview</a>, then come back.
+          <span class="label">Don't have Claude in your terminal yet?</span> Install the <code>claude</code> command with the one-liner at <a href="https://docs.claude.com/en/docs/claude-code/overview">docs.claude.com/en/docs/claude-code/overview</a>, then come back.
         </div>
       </div>
 
@@ -575,7 +575,7 @@
     <summary>I get "Roo API key is missing or invalid."</summary>
     <p>The key doesn't match one Roo recognizes. Go back to <a href="https://app.roo.bz">app.roo.bz</a> → Account Settings → Api Keys, copy the key fresh (or generate a new one if you're not sure), and set it again:</p>
     <ul>
-      <li><strong>Claude Code:</strong> remove the old entry with <code>claude mcp remove roo</code>, then re-run the <code>claude mcp add</code> command from Step 2 with the fresh key.</li>
+      <li><strong>Terminal:</strong> remove the old entry with <code>claude mcp remove roo</code>, then re-run the <code>claude mcp add</code> command from Step 2 with the fresh key.</li>
       <li><strong>Claude Desktop:</strong> Settings → Connectors → Roo → edit the <code>x-api-key</code> value and save.</li>
     </ul>
   </details>
@@ -585,7 +585,7 @@
     <p>Click the entry (or run <code>claude mcp get roo</code>) to see the error. The two most common causes:</p>
     <ul>
       <li>Missing or wrong header value — re-add with the correct <code>x-api-key</code>.</li>
-      <li>Older Claude Code version that doesn't speak the Streamable HTTP transport yet. Update with the installer at <a href="https://docs.claude.com/en/docs/claude-code/overview">docs.claude.com/en/docs/claude-code/overview</a>.</li>
+      <li>Older <code>claude</code> version that doesn't speak the Streamable HTTP transport yet. Update with the installer at <a href="https://docs.claude.com/en/docs/claude-code/overview">docs.claude.com/en/docs/claude-code/overview</a>.</li>
     </ul>
   </details>
 
@@ -594,7 +594,7 @@
     <p>That field is rolling out gradually. If your account doesn't have it, you have two options:</p>
     <ul>
       <li>Use the <a href="https://dzisner.github.io/roo-mcp/install-guide.html">local-install guide</a> instead — a few more steps, but no beta feature required.</li>
-      <li>Switch to Claude Code (terminal) for now, which has supported this since launch.</li>
+      <li>Use the terminal path above for now — it has supported this since launch.</li>
     </ul>
   </details>
 
