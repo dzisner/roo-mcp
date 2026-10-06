@@ -56,9 +56,6 @@ Resources:
           - src/http/lambda.ts
         OutExtension:
           - .js=.mjs
-        # Lambda ESM has no top-level `require`; shim one for any CJS dep that reaches for it.
-        Banner:
-          js: "import{createRequire}from'node:module';const require=createRequire(import.meta.url);"
 
 Outputs:
   CustomDomain:
