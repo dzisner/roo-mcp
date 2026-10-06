@@ -338,9 +338,9 @@
   }
   .form-table .row {
     display: grid;
-    grid-template-columns: 10rem 1fr;
+    grid-template-columns: 10rem 1fr auto;
     gap: 0.5rem;
-    align-items: baseline;
+    align-items: center;
   }
   .form-table .row .k {
     font-family: var(--sans);
@@ -356,8 +356,40 @@
     color: var(--ink);
     word-break: break-all;
   }
+  .form-table .row.note .v {
+    font-family: var(--sans);
+    color: var(--muted);
+    font-style: italic;
+  }
+  .form-table .copy-mini {
+    font-family: var(--sans);
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 0.2rem 0.55rem;
+    cursor: pointer;
+    transition: background 120ms, color 120ms, border-color 120ms;
+  }
+  .form-table .copy-mini:hover {
+    color: var(--ink);
+    border-color: var(--ink);
+  }
+  .form-table .copy-mini.done {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #04150C;
+  }
   @media (max-width: 460px) {
-    .form-table .row { grid-template-columns: 1fr; gap: 0.15rem; }
+    .form-table .row {
+      grid-template-columns: 1fr auto;
+      gap: 0.15rem 0.5rem;
+    }
+    .form-table .row .k { grid-column: 1 / -1; }
   }
 
   section.try {
@@ -529,18 +561,38 @@
         <p>Inside Claude Desktop:</p>
         <ol>
           <li>Click your profile picture (bottom-left) → <strong>Settings</strong> → <strong>Connectors</strong>.</li>
-          <li>Scroll to the bottom and click <strong>Add custom connector</strong>.</li>
-          <li>Fill in these fields:</li>
+          <li>At the top right, click <strong>+ Add</strong> → <strong>Add custom connector</strong>.</li>
+          <li>Fill in these fields (tap <strong>Copy</strong> to grab each value):</li>
         </ol>
         <div class="form-table">
-          <div class="row"><span class="k">Name</span><span class="v">Roo</span></div>
-          <div class="row"><span class="k">Remote MCP server URL</span><span class="v">https://mcp.roo.bz/mcp</span></div>
-          <div class="row"><span class="k">Sign-in</span><span class="v">No sign-in</span></div>
-          <div class="row"><span class="k">Request headers → Name</span><span class="v">x-api-key</span></div>
-          <div class="row"><span class="k">Request headers → Value</span><span class="v">(paste your key)</span></div>
+          <div class="row">
+            <span class="k">Name</span>
+            <span class="v" data-copy>Roo</span>
+            <button class="copy-mini" type="button" onclick="copyRowValue(this)">Copy</button>
+          </div>
+          <div class="row">
+            <span class="k">Remote MCP server URL</span>
+            <span class="v" data-copy>https://mcp.roo.bz/mcp</span>
+            <button class="copy-mini" type="button" onclick="copyRowValue(this)">Copy</button>
+          </div>
+          <div class="row">
+            <span class="k">Sign-in</span>
+            <span class="v">No sign-in</span>
+            <span></span>
+          </div>
+          <div class="row">
+            <span class="k">Request headers → Name</span>
+            <span class="v" data-copy>x-api-key</span>
+            <button class="copy-mini" type="button" onclick="copyRowValue(this)">Copy</button>
+          </div>
+          <div class="row note">
+            <span class="k">Request headers → Value</span>
+            <span class="v">paste your API key from Step 1</span>
+            <span></span>
+          </div>
         </div>
         <ol start="4">
-          <li>Click <strong>Add</strong> (or <strong>Save</strong>). You're done.</li>
+          <li>Click <strong>Add</strong>. You're done.</li>
         </ol>
         <div class="warn">
           <span class="label">Don't see "Request headers"?</span> That section is in beta rollout and some accounts don't have it yet. If it's missing, use the <a href="https://dzisner.github.io/roo-mcp/install-guide.html">longer local-install guide</a> for now — same end result, a few more steps.
@@ -648,6 +700,22 @@
     }).catch(() => {
       btn.textContent = 'Press Ctrl/⌘+C';
       setTimeout(() => { btn.textContent = 'Copy'; }, 1800);
+    });
+  }
+
+  function copyRowValue(btn) {
+    const row = btn.closest('.row');
+    if (!row) return;
+    const valEl = row.querySelector('.v[data-copy]');
+    if (!valEl) return;
+    const text = valEl.innerText.trim();
+    navigator.clipboard.writeText(text).then(() => {
+      btn.textContent = 'Copied ✓';
+      btn.classList.add('done');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('done'); }, 1500);
+    }).catch(() => {
+      btn.textContent = '!';
+      setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
     });
   }
 </script>
