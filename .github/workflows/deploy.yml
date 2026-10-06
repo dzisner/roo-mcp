@@ -38,20 +38,6 @@ jobs:
         with:
           use-installer: true
 
-      - name: Debug OIDC token claims (temporary)
-        run: |
-          TOKEN=$(curl -sLS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | python3 -c "import sys,json;print(json.load(sys.stdin)['value'])")
-          PAYLOAD=$(echo "$TOKEN" | cut -d. -f2)
-          PAD=$(printf '%*s' $(( (4 - ${#PAYLOAD} % 4) % 4 )) '' | tr ' ' '=')
-          CLAIMS=$(echo "$PAYLOAD$PAD" | tr '_-' '/+' | base64 -d)
-          SUB=$(echo "$CLAIMS" | python3 -c "import sys,json;print(json.load(sys.stdin).get('sub',''))")
-          AUD=$(echo "$CLAIMS" | python3 -c "import sys,json;print(json.load(sys.stdin).get('aud',''))")
-          ISS=$(echo "$CLAIMS" | python3 -c "import sys,json;print(json.load(sys.stdin).get('iss',''))")
-          echo "::warning title=OIDC sub::$SUB"
-          echo "::warning title=OIDC aud::$AUD"
-          echo "::warning title=OIDC iss::$ISS"
-
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}

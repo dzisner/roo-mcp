@@ -20,6 +20,7 @@
     "dev": "tsx ./src/index.ts",
     "dev:http": "tsx ./src/http/node-server.ts",
     "typecheck": "tsc --noEmit",
+    "smoke:prod": "bash -c 'ROO_API_KEY=$(grep ROO_API_KEY .env | cut -d= -f2) bash scripts/smoke-http.sh https://mcp.roo.bz'",
     "prepublishOnly": "npm run typecheck && npm run build"
   },
   "engines": {
