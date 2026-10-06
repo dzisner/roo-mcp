@@ -60,6 +60,11 @@ jobs:
       - name: Install deps
         run: npm ci
 
+      - name: Expose node_modules/.bin on PATH
+        # SAM's esbuild builder spawns a prod-only npm install, so it can't see our
+        # devDep esbuild. Point PATH at the one we already installed.
+        run: echo "$GITHUB_WORKSPACE/node_modules/.bin" >> "$GITHUB_PATH"
+
       - name: Typecheck
         run: npm run typecheck
 
