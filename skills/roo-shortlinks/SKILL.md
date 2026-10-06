@@ -29,7 +29,7 @@ When the Roo MCP server is loaded, do the work through its tools rather than des
 - `roo_list_shortlinks`, `roo_create_shortlink`, `roo_get_shortlink`, `roo_update_shortlink` — CRUD. `roo_create_shortlink` also accepts an optional nested `add_ons` object to attach add-ons up front in the same call (atomic, single API round-trip, and when `qr` is included the pre-rendered QR image comes back inline).
 - `roo_list_custom_domains` — the authoritative list of custom domains attached to the account (calls `/v1/account/custom-domains`). Distinct from the domain a particular shortlink is on — `roo.ws` and `roo.bz` are Roo-owned defaults, not custom domains.
 - `roo_make_permanent`, `roo_update_permanent_settings` — permanence (both hit the same PATCH endpoint).
-- `roo_get_qr_code` — retrieve the QR image (returns a base64 data URI or writes to a file if `save_to` is given).
+- `roo_get_qr_code` — retrieve the QR image (returns an inline image content block; the client renders it directly, and the user can save it from the chat UI).
 - `roo_set_scheduled_redirect`, `roo_set_click_count_redirect`, `roo_set_webhook`, `roo_set_preview_link`, `roo_set_qr_addon` — the five add-ons.
 
 If no MCP server is loaded, this skill still guides hand-authored calls to the Roo REST API (for example, inside a Make scenario). Build requests against the field shapes described below.

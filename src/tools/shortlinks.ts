@@ -7,8 +7,6 @@
 // - Pagination: request `limit` + `lastKey`; response returns `nextKey`. No `search` param exists.
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { writeFile } from 'node:fs/promises';
-import { isAbsolute as pathIsAbsolute } from 'node:path';
 import type { RooClient } from '../roo-client.js';
 import { encodeRooId } from '../roo-client.js';
 import type {
@@ -141,12 +139,6 @@ const UpdatePermanentSettingsInputSchema = {
 
 const GetQrCodeInputSchema = {
   id: z.string().min(1).describe('Shortlink id.'),
-  save_to: z
-    .string()
-    .optional()
-    .describe(
-      'Optional ABSOLUTE filesystem path. If provided, the QR image is decoded and written to that path; the tool returns the path instead of embedding the image. Parent directory must already exist.',
-    ),
 };
 
 const ListCustomDomainsInputSchema = {
@@ -441,10 +433,10 @@ export function registerShortlinkTools(server: McpServer, client: RooClient): vo
     {
       title: 'Roo — get shortlink QR image',
       description:
-        'Fetch the QR image for a shortlink. Requires the qrCode add-on to already be configured on the shortlink (via roo_set_qr_addon) — otherwise Roo returns a qr_not_enabled error. By default returns the image inline as an MCP image content block; pass save_to (absolute path) to write the bytes to a file instead.',
+        'Fetch the QR image for a shortlink. Requires the qrCode add-on to already be configured on the shortlink (via roo_set_qr_addon) — otherwise Roo returns a qr_not_enabled error. Returns the image inline as an MCP image content block; the client renders it directly. The user can save it from the chat UI (right-click → Save Image, or the client\'s download button).',
       inputSchema: GetQrCodeInputSchema,
     },
-    async ({ id, save_to }) => {
+    async ({ id }) => {
       const res = await client.get<RooQrCodeResponse>(
         `/v1/urls/${encodeRooId(id)}/qr-code`,
       );
@@ -457,24 +449,6 @@ export function registerShortlinkTools(server: McpServer, client: RooClient): vo
       const { mimeType, base64: dataUri } = res.data;
       const rawBase64 = dataUri.replace(/^data:[^;]+;base64,/, '');
       const bytes = Buffer.from(rawBase64, 'base64');
-
-      if (save_to !== undefined) {
-        if (!pathIsAbsolute(save_to)) {
-          throw new RooError('validation', 'save_to must be an absolute filesystem path.');
-        }
-        try {
-          await writeFile(save_to, bytes);
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          throw new RooError('unknown', `Failed to write QR image to ${save_to}: ${msg}`);
-        }
-        return {
-          content: [
-            { type: 'text', text: `Saved ${bytes.length}-byte ${mimeType} QR for ${id} → ${save_to}` },
-            { type: 'text', text: fenceJson({ id, saved_to: save_to, mime_type: mimeType, bytes: bytes.length }) },
-          ],
-        };
-      }
 
       return {
         content: [
