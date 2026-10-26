@@ -20,8 +20,8 @@ export function buildServer({ apiKey }: BuildServerOptions): McpServer {
     icons: [
       {
         src: ROO_ICON_DATA_URL,
-        mimeType: 'image/vnd.microsoft.icon',
-        sizes: ['48x48', '32x32'],
+        mimeType: 'image/png',
+        sizes: ['256x256'],
       },
     ],
   });
