@@ -64,14 +64,14 @@ jobs:
 
       - name: SAM deploy
         run: |
+          PARAMS=("CertificateArn=$CERTIFICATE_ARN" "JweKey=$JWE_KEY")
+          # SAM rejects "Key=" with no value, so only pass JweKeyPrevious when actually rotating.
+          [[ -n "$JWE_KEY_PREVIOUS" ]] && PARAMS+=("JweKeyPrevious=$JWE_KEY_PREVIOUS")
           sam deploy \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --region "$AWS_REGION" \
-            --parameter-overrides \
-              "CertificateArn=$CERTIFICATE_ARN" \
-              "JweKey=$JWE_KEY" \
-              "JweKeyPrevious=$JWE_KEY_PREVIOUS"
+            --parameter-overrides "${PARAMS[@]}"
 
       - name: Describe outputs
         run: |
