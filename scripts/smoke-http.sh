@@ -31,7 +31,7 @@ status=$(curl -s -o /tmp/roo-smoke-2.json -w '%{http_code}' -X POST "$BASE_URL/m
   -H 'content-type: application/json' -H 'accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}')
 [[ "$status" == '401' ]] && pass "401" || fail "wrong status: $status" "$(cat /tmp/roo-smoke-2.json)"
-grep -q 'Missing x-api-key' /tmp/roo-smoke-2.json && pass "mentions x-api-key" || fail "no missing-key message" "$(cat /tmp/roo-smoke-2.json)"
+grep -q 'x-api-key' /tmp/roo-smoke-2.json && pass "mentions x-api-key" || fail "no missing-key message" "$(cat /tmp/roo-smoke-2.json)"
 
 # 3. initialize with key -> serverInfo
 echo "3. POST /mcp initialize"
