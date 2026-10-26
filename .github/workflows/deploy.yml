@@ -26,6 +26,8 @@ jobs:
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
       CERTIFICATE_ARN: ${{ vars.CERTIFICATE_ARN }}
+      JWE_KEY: ${{ secrets.JWE_KEY }}
+      JWE_KEY_PREVIOUS: ${{ secrets.JWE_KEY_PREVIOUS }}
     steps:
       - uses: actions/checkout@v4
 
@@ -66,7 +68,10 @@ jobs:
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --region "$AWS_REGION" \
-            --parameter-overrides "CertificateArn=$CERTIFICATE_ARN"
+            --parameter-overrides \
+              "CertificateArn=$CERTIFICATE_ARN" \
+              "JweKey=$JWE_KEY" \
+              "JweKeyPrevious=$JWE_KEY_PREVIOUS"
 
       - name: Describe outputs
         run: |

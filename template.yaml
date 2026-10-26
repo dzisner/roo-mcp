@@ -10,6 +10,19 @@ Parameters:
   CertificateArn:
     Type: String
     Description: ARN of an ACM certificate for DomainName, in the SAME region as this stack.
+  JweKey:
+    Type: String
+    NoEcho: true
+    Description: >
+      Base64 of 32 random bytes used to encrypt OAuth tokens.
+      Generate with: openssl rand -base64 32. Supplied by GitHub Actions from a secret.
+  JweKeyPrevious:
+    Type: String
+    NoEcho: true
+    Default: ''
+    Description: >
+      Optional. Previous value of JweKey during a rotation. Decrypt accepts tokens
+      minted under either key; mint uses JweKey only. Leave empty when not rotating.
 
 Globals:
   Function:
@@ -36,7 +49,12 @@ Resources:
     Properties:
       CodeUri: .
       Handler: lambda.handler
-      Description: Thin MCP wrapper. Stateless, per-request, passes caller's x-api-key to api.roo.bz.
+      Description: Thin MCP wrapper + OAuth 2.1 shim. Stateless, per-request.
+      Environment:
+        Variables:
+          ROO_MCP_JWE_KEY: !Ref JweKey
+          ROO_MCP_JWE_KEY_PREVIOUS: !Ref JweKeyPrevious
+          ROO_MCP_ISSUER: !Sub 'https://${DomainName}'
       Events:
         Default:
           Type: HttpApi

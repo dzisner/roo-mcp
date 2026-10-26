@@ -21,6 +21,7 @@
     "dev:http": "tsx ./src/http/node-server.ts",
     "typecheck": "tsc --noEmit",
     "smoke:prod": "bash scripts/smoke-prod.sh",
+    "smoke:oauth": "tsx scripts/smoke-oauth.ts",
     "prepublishOnly": "npm run typecheck && npm run build"
   },
   "engines": {
@@ -53,6 +54,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "jose": "^6.2.13",
     "zod": "^4.4.3"
   },
   "devDependencies": {
