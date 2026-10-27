@@ -1,4 +1,5 @@
-<title>Connect Roo to Claude</title>
+<meta charset="utf-8">
+<title>Connect Roo to Claude or ChatGPT</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root {
@@ -500,15 +501,15 @@
 
 <header class="hero">
   <p class="eyebrow">Beta · 3 minutes</p>
-  <h1>Connect <em>Roo</em> to Claude.</h1>
-  <p class="lede">Two things to paste — a URL and your API key — and you can ask Claude to make shortlinks, add QR codes, or fire off webhooks in plain English.</p>
+  <h1>Connect <em>Roo</em> to your AI.</h1>
+  <p class="lede">Install the Roo connector in Claude or ChatGPT, paste your API key once, and ask it to make shortlinks, add QR codes, or fire off webhooks in plain English.</p>
 </header>
 
 <section class="needs">
   <h2>Before you start, you'll need</h2>
   <ul>
     <li>An account on <a href="https://app.roo.bz">app.roo.bz</a> — the free "Hop" plan works fine.</li>
-    <li>Claude running <strong>in your terminal</strong>, <strong>or</strong> the <strong>Claude Desktop</strong> app.</li>
+    <li>Claude running <strong>in your terminal</strong>, the <strong>Claude Desktop</strong> app, <strong>or</strong> <strong>ChatGPT</strong> (Plus, Pro, Business, or Enterprise).</li>
   </ul>
 </section>
 
@@ -520,7 +521,7 @@
       <h2>Get your Roo API key</h2>
       <p>Sign into <a href="https://app.roo.bz">app.roo.bz</a>. Click your profile → <strong>Account Settings</strong> → <strong>Api Keys</strong> tab. Press the copy button next to your key.</p>
       <div class="tip">
-        <span class="label">Keep it private</span> Treat this like a password. Don't paste it in a chat, an email, or a support ticket. You'll paste it once in Step 2 and Claude keeps it on your machine from then on.
+        <span class="label">Keep it private</span> Treat this like a password. Don't paste it in a chat, an email, or a support ticket. You'll paste it once in Step 2 and your AI holds onto it from then on.
       </div>
     </div>
   </article>
@@ -528,12 +529,13 @@
   <!-- ─── 2. pick client + connect ─── -->
   <article class="step">
     <div>
-      <h2>Connect Claude to Roo</h2>
-      <p>Pick the Claude you use:</p>
+      <h2>Connect your AI to Roo</h2>
+      <p>Pick the one you use:</p>
 
-      <div class="client-toggle" role="tablist" aria-label="Choose your Claude">
+      <div class="client-toggle" role="tablist" aria-label="Choose your AI">
         <button type="button" data-client="cli" aria-pressed="true">Terminal</button>
         <button type="button" data-client="desktop" aria-pressed="false">Desktop app</button>
+        <button type="button" data-client="chatgpt" aria-pressed="false">ChatGPT</button>
       </div>
 
       <!-- CLI panel -->
@@ -598,6 +600,49 @@
           <span class="label">Don't see "Request headers"?</span> That section is in beta rollout and some accounts don't have it yet. If it's missing, use the <a href="https://dzisner.github.io/roo-mcp/install-guide.html">longer local-install guide</a> for now — same end result, a few more steps.
         </div>
       </div>
+
+      <!-- ChatGPT panel -->
+      <div class="client-panel" data-client-panel="chatgpt">
+        <p>Inside ChatGPT (web):</p>
+        <ol>
+          <li>Go to <a href="https://chatgpt.com/plugins">chatgpt.com/plugins</a> (or Settings → Plugins → <strong>Browse directory</strong>).</li>
+          <li>Top-right: click <strong>Add ▾</strong> → <strong>Add custom MCP server</strong>.</li>
+          <li>Fill in these fields (tap <strong>Copy</strong> to grab each value):</li>
+        </ol>
+        <div class="form-table">
+          <div class="row">
+            <span class="k">Icon</span>
+            <span class="v"><a href="roo-icon.png" download="roo-icon.png">download roo-icon.png</a></span>
+            <span></span>
+          </div>
+          <div class="row">
+            <span class="k">Name</span>
+            <span class="v" data-copy>Roo</span>
+            <button class="copy-mini" type="button" onclick="copyRowValue(this)">Copy</button>
+          </div>
+          <div class="row">
+            <span class="k">Connection → Server URL</span>
+            <span class="v" data-copy>https://mcp.roo.bz/mcp</span>
+            <button class="copy-mini" type="button" onclick="copyRowValue(this)">Copy</button>
+          </div>
+          <div class="row">
+            <span class="k">Authentication</span>
+            <span class="v">OAuth</span>
+            <span></span>
+          </div>
+        </div>
+        <ol start="4">
+          <li>Check <strong>"I understand and want to continue"</strong>, then click <strong>Create as a plugin</strong>.</li>
+          <li>A popup opens with Roo's <em>Connect Roo to Roo</em> page. Paste your API key from Step 1, click <strong>Continue</strong>.</li>
+          <li>Done. Click <strong>Try in chat</strong> at the top right to start.</li>
+        </ol>
+        <div class="tip">
+          <span class="label">Icon only sticks before install</span> ChatGPT lets you upload the icon only in the Add dialog, not after. If you skip it, you get a generic glyph you can't change without re-adding the plugin.
+        </div>
+        <div class="warn">
+          <span class="label">Don't see "Add custom MCP server"?</span> It's a Plus/Pro/Business/Enterprise feature. Free ChatGPT accounts don't currently have it.
+        </div>
+      </div>
     </div>
   </article>
 
@@ -653,6 +698,21 @@
   <details>
     <summary>I don't see my custom domain — my links are on roo.ws.</summary>
     <p>That's normal — custom domains are opt-in. Ask Claude: <em>"Show me my Roo custom domains."</em> If one shows up as <code>Issued</code>, you can ask for shortlinks on it specifically: <em>"Make a link on l.mydomain.com for https://example.com/promo, slug 'launch'."</em></p>
+  </details>
+
+  <details>
+    <summary>ChatGPT: the Roo icon shows as a generic glyph.</summary>
+    <p>You skipped the icon upload in the Add dialog. ChatGPT doesn't let you change the icon after install. To fix it:</p>
+    <ul>
+      <li>On the Roo plugin page, open the <strong>⋯</strong> menu → <strong>Delete plugin</strong>.</li>
+      <li>Re-run Step 2's ChatGPT flow and remember to upload <a href="roo-icon.png" download="roo-icon.png">roo-icon.png</a> as the Icon.</li>
+      <li>Re-paste your API key when the Roo authorize popup opens.</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>ChatGPT says I don't have access to custom MCP servers.</summary>
+    <p>Custom MCP servers are a Plus/Pro/Business/Enterprise feature. Free accounts don't get it today. If your plan does include it but you still don't see the option, check <strong>Settings → Beta features</strong> for a Developer-mode toggle.</p>
   </details>
 
   <details>
