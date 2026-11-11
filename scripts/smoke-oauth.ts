@@ -290,8 +290,33 @@ async function main(): Promise<void> {
   }
   console.log('[OK]   401 WWW-Authenticate carries resource_metadata');
 
-  // 10. Refresh token exchange
-  const refreshResp = await handler(
+  // 10. Replay the auth code — F03. Second redemption of the same code must fail.
+  const replayResp = await handler(
+    makeEvent({
+      method: 'POST',
+      path: '/token',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: REDIRECT_URI,
+        client_id: clientId,
+        code_verifier: verifier,
+      }).toString(),
+    }),
+  );
+  expectStatus('auth code replay rejected', replayResp, 400);
+  if (!replayResp.body?.includes('already been used')) {
+    console.error('[FAIL] auth code replay did not mention single-use');
+    console.error('  body:', replayResp.body?.slice(0, 400));
+    process.exit(1);
+  }
+  console.log('[OK]   auth code replay returns invalid_grant with single-use message');
+
+  // 11. Refresh rotation — F02. First use mints a new pair; the OLD refresh must
+  // then be dead; using the NEW one must still work; a SECOND use of the NEW one
+  // triggers replay detection and revokes the family.
+  const refresh1 = await handler(
     makeEvent({
       method: 'POST',
       path: '/token',
@@ -303,9 +328,90 @@ async function main(): Promise<void> {
       }).toString(),
     }),
   );
-  expectStatus('refresh token exchange', refreshResp, 200);
+  expectStatus('refresh token exchange', refresh1, 200);
+  const rotated = JSON.parse(refresh1.body ?? '{}') as {
+    access_token: string;
+    refresh_token: string;
+  };
+  if (!rotated.refresh_token || rotated.refresh_token === tokens.refresh_token) {
+    console.error('[FAIL] refresh did not rotate the refresh_token');
+    process.exit(1);
+  }
+  console.log('[OK]   refresh rotated: new refresh_token differs from old');
 
-  // 11. Discovery docs
+  // 11b. Old refresh now stale → replay detection fires.
+  const oldReplay = await handler(
+    makeEvent({
+      method: 'POST',
+      path: '/token',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: tokens.refresh_token,
+        client_id: clientId,
+      }).toString(),
+    }),
+  );
+  expectStatus('old refresh rejected', oldReplay, 400);
+  if (!oldReplay.body?.includes('already been used')) {
+    console.error('[FAIL] replay of old refresh did not fire reuse detection');
+    console.error('  body:', oldReplay.body?.slice(0, 400));
+    process.exit(1);
+  }
+  console.log('[OK]   old refresh replay revokes the family');
+
+  // 11c. Family is now revoked, so the rotated refresh — which was fine a moment
+  // ago — must also be rejected.
+  const postRevoke = await handler(
+    makeEvent({
+      method: 'POST',
+      path: '/token',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: rotated.refresh_token,
+        client_id: clientId,
+      }).toString(),
+    }),
+  );
+  expectStatus('rotated refresh dead after revoke', postRevoke, 400);
+  if (!postRevoke.body?.includes('revoked')) {
+    console.error('[FAIL] rotated refresh should be revoked after family kill');
+    console.error('  body:', postRevoke.body?.slice(0, 400));
+    process.exit(1);
+  }
+  console.log('[OK]   rotated refresh dies with the family');
+
+  // 12. Rate limiting — F08. /token's limit is 30/min per IP. We just burned a
+  // handful of /token calls above (all from 127.0.0.1); fire enough more to push
+  // past 30 within the same minute and confirm a 429 lands.
+  let gotThrottle = false;
+  for (let i = 0; i < 40; i++) {
+    const resp = await handler(
+      makeEvent({
+        method: 'POST',
+        path: '/token',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: 'grant_type=authorization_code&code=garbage&redirect_uri=x&client_id=x&code_verifier=x',
+      }),
+    );
+    if (resp.statusCode === 429) {
+      gotThrottle = true;
+      const retry = resp.headers?.['retry-after'] ?? resp.headers?.['Retry-After'];
+      if (typeof retry !== 'string' || !/^\d+$/.test(retry)) {
+        console.error('[FAIL] 429 missing Retry-After');
+        process.exit(1);
+      }
+      break;
+    }
+  }
+  if (!gotThrottle) {
+    console.error('[FAIL] /token did not rate-limit within 40 extra requests');
+    process.exit(1);
+  }
+  console.log('[OK]   /token rate-limits past 30/min with Retry-After');
+
+  // 13. Discovery docs
   const authSvr = await handler(
     makeEvent({ method: 'GET', path: '/.well-known/oauth-authorization-server' }),
   );

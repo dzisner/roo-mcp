@@ -44,17 +44,56 @@ Resources:
         SecurityPolicy: TLS_1_2
       DisableExecuteApiEndpoint: false   # keep the *.execute-api.* URL for pre-DNS testing
 
+  # OAuth grants + rate-limit counters. One single-table-design table, partitioned
+  # by a prefixed `pk` (code#..., refresh#..., family#..., rl#...). TTL on the
+  # `ttl` attribute reclaims expired rows automatically, so the table never grows
+  # beyond active-session size regardless of traffic.
+  #
+  # PAY_PER_REQUEST is the right default: traffic is bursty (every OAuth flow
+  # writes exactly one code item and one refresh item per rotation), and
+  # provisioning capacity for the 99th percentile wastes money while still
+  # throttling during spikes.
+  RooMcpGrantsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false   # Items are ephemeral (TTL <= 90 days); a snapshot would be stale and PII.
+      SSESpecification:
+        SSEEnabled: true                    # AWS-managed KMS; the items contain OAuth artifacts, not plaintext keys, but defense in depth.
+
   RooMcpFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: .
       Handler: lambda.handler
-      Description: Thin MCP wrapper + OAuth 2.1 shim. Stateless, per-request.
+      Description: Thin MCP wrapper + OAuth 2.1 shim. Grants state lives in RooMcpGrantsTable.
       Environment:
         Variables:
           ROO_MCP_JWE_KEY: !Ref JweKey
           ROO_MCP_JWE_KEY_PREVIOUS: !Ref JweKeyPrevious
           ROO_MCP_ISSUER: !Sub 'https://${DomainName}'
+          ROO_MCP_GRANTS_TABLE: !Ref RooMcpGrantsTable
+      Policies:
+        # Minimum needed by src/oauth/grants.ts: PutItem (conditional + unconditional),
+        # GetItem (family revoke check), UpdateItem (rate-limit counter). No Delete,
+        # no Scan, no Query — DDB TTL handles cleanup.
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:GetItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt RooMcpGrantsTable.Arn
       Events:
         Default:
           Type: HttpApi
@@ -88,3 +127,6 @@ Outputs:
   HostedZoneIdForAlias:
     Description: If using Route 53 ALIAS instead of CNAME, use this hosted zone.
     Value: !GetAtt RooMcpApi.DomainName.RegionalHostedZoneId
+  GrantsTableName:
+    Description: DynamoDB table holding OAuth grant state and rate-limit counters.
+    Value: !Ref RooMcpGrantsTable

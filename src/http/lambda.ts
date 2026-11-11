@@ -22,6 +22,7 @@ import { handleRegister } from '../oauth/register.js';
 import { handleAuthorizeGet, handleAuthorizePost } from '../oauth/authorize.js';
 import { handleToken } from '../oauth/token.js';
 import { decryptAccessToken, JWE_ISSUER } from '../oauth/jwe.js';
+import { rateLimit } from '../oauth/grants.js';
 
 function unauthorizedMcp(): Response {
   return new Response(
@@ -106,6 +107,57 @@ async function handleMcp(event: APIGatewayProxyEventV2): Promise<APIGatewayProxy
   return toApiGwResponse(response);
 }
 
+// Pick a client identifier for rate limiting. API Gateway's $default route exposes
+// the source IP via requestContext.http.sourceIp, and (if the upstream is Cloudflare
+// or similar) x-forwarded-for carries the real client. Prefer the first IP in that
+// list so a single abuser behind a CDN can still be limited independently; fall
+// back to sourceIp when nothing is forwarded.
+function clientIp(event: APIGatewayProxyEventV2): string {
+  const xff = event.headers['x-forwarded-for'];
+  if (typeof xff === 'string' && xff.length > 0) {
+    const first = xff.split(',')[0]?.trim();
+    if (first) return first;
+  }
+  return event.requestContext.http.sourceIp ?? 'unknown';
+}
+
+interface LimitSpec {
+  bucket: string;
+  limit: number;
+  windowSeconds: number;
+}
+
+function tooManyRequests(retryAfter: number): APIGatewayProxyStructuredResultV2 {
+  // Keep the body minimal and generic. OAuth clients retry on 429 with a cap;
+  // we just need to give them the Retry-After hint.
+  return {
+    statusCode: 429,
+    headers: {
+      'content-type': 'application/json',
+      'cache-control': 'no-store',
+      'retry-after': String(Math.max(1, retryAfter)),
+    },
+    body: JSON.stringify({
+      error: 'slow_down',
+      error_description: 'Too many requests. Try again shortly.',
+    }),
+  };
+}
+
+async function enforceLimit(spec: LimitSpec): Promise<APIGatewayProxyStructuredResultV2 | null> {
+  try {
+    const result = await rateLimit(spec);
+    return result.ok ? null : tooManyRequests(result.retryAfter);
+  } catch (err) {
+    // Fail open. If DDB is down, we'd rather take the hit than start 429ing
+    // legitimate OAuth flows. The error still goes to CloudWatch for alerting.
+    process.stderr.write(
+      JSON.stringify({ evt: 'rate_limit_backend_error', msg: String(err instanceof Error ? err.message : err) }) + '\n',
+    );
+    return null;
+  }
+}
+
 export const handler = async (
   event: APIGatewayProxyEventV2,
 ): Promise<APIGatewayProxyStructuredResultV2> => {
@@ -130,9 +182,28 @@ export const handler = async (
     return toApiGwResponse(protectedResourceMetadata());
   }
   if (path === '/register') return toApiGwResponse(await handleRegister(toRequest(event)));
-  if (path === '/authorize' && method === 'GET') return toApiGwResponse(await handleAuthorizeGet(toRequest(event)));
-  if (path === '/authorize' && method === 'POST') return toApiGwResponse(await handleAuthorizePost(toRequest(event)));
-  if (path === '/token') return toApiGwResponse(await handleToken(toRequest(event)));
+
+  // Rate limits on the auth plane (F08). Numbers are per-IP, per-60s. They are
+  // deliberately generous for real users (who click through /authorize once)
+  // and deliberately cheap for attackers (who need thousands of tries to be
+  // useful). Adjust in one place if abuse shifts the shape.
+  const ip = clientIp(event);
+  if (path === '/authorize' && method === 'GET') {
+    const throttled = await enforceLimit({ bucket: `authorize_get:${ip}`, limit: 30, windowSeconds: 60 });
+    if (throttled) return throttled;
+    return toApiGwResponse(await handleAuthorizeGet(toRequest(event)));
+  }
+  if (path === '/authorize' && method === 'POST') {
+    // POST hits the Roo API to validate the key, so it's the expensive path.
+    const throttled = await enforceLimit({ bucket: `authorize_post:${ip}`, limit: 10, windowSeconds: 60 });
+    if (throttled) return throttled;
+    return toApiGwResponse(await handleAuthorizePost(toRequest(event)));
+  }
+  if (path === '/token') {
+    const throttled = await enforceLimit({ bucket: `token:${ip}`, limit: 30, windowSeconds: 60 });
+    if (throttled) return throttled;
+    return toApiGwResponse(await handleToken(toRequest(event)));
+  }
 
   return {
     statusCode: 404,

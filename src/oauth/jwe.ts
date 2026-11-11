@@ -62,6 +62,9 @@ export interface AuthCodePayload extends JWTPayload {
   codeChallengeMethod: 'S256';
   redirectUri: string;
   clientId: string;
+  // Random per-code identifier. /token writes a "used" marker keyed on this to
+  // enforce single-use (F03). Required on every newly-minted code.
+  jti: string;
   use: 'code';
 }
 
@@ -74,6 +77,13 @@ export interface AccessTokenPayload extends JWTPayload {
 export interface RefreshTokenPayload extends JWTPayload {
   rooApiKey: string;
   clientId: string;
+  // Per-refresh identifier; /token marks this consumed on use so a replay is
+  // rejected and triggers family revocation (F02).
+  jti: string;
+  // Chain identifier. All refresh tokens descended from the same auth_code grant
+  // share this; revoking it (on replay detection) kills every outstanding
+  // refresh in the family.
+  familyId: string;
   use: 'refresh';
 }
 

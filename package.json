@@ -53,6 +53,8 @@
     "access": "public"
   },
   "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1166.0",
+    "@aws-sdk/lib-dynamodb": "^3.1166.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "jose": "^6.2.13",
     "zod": "^4.4.3"

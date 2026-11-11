@@ -11,6 +11,7 @@
 //
 // We also render the client's name and the redirect host prominently so a user who
 // did NOT initiate this flow (phishing) sees an unfamiliar app name and bails.
+import { randomUUID } from 'node:crypto';
 import { RooClient } from '../roo-client.js';
 import { decryptClientId, mintAuthCode } from './jwe.js';
 import { ROO_ICON_DATA_URL } from '../icon.js';
@@ -400,6 +401,9 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
     codeChallengeMethod: 'S256',
     redirectUri: params.redirectUri!,
     clientId: params.clientId,
+    // Unique per code; /token writes a "used" marker keyed on this so a
+    // replay gets rejected (F03).
+    jti: randomUUID(),
   });
 
   const redirect = new URL(params.redirectUri!);
