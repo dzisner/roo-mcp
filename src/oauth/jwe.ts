@@ -101,6 +101,44 @@ async function mint({ payload, ttlSeconds }: MintOptions): Promise<string> {
     .encrypt(keys.current);
 }
 
+// Categorise a jose decrypt failure for internal logging ONLY. Callers must
+// never put this classification into a response or www-authenticate header —
+// distinguishing "expired" from "tampered" to an attacker lets them probe the
+// key boundary and learn whether a token was ever valid.
+export type JweFailureKind =
+  | 'expired'
+  | 'signature'
+  | 'malformed'
+  | 'use_mismatch'
+  | 'issuer_mismatch'
+  | 'unknown';
+
+export function classifyJweError(err: unknown): JweFailureKind {
+  if (err instanceof Error) {
+    // jose throws named subclasses whose constructor.name is stable across its
+    // 5.x/6.x line. We match on that rather than `instanceof` to avoid pinning
+    // ourselves to a specific jose major.
+    const name = err.constructor.name;
+    if (name === 'JWTExpired') return 'expired';
+    if (name === 'JWEDecryptionFailed' || name === 'JWSSignatureVerificationFailed') return 'signature';
+    if (name === 'JWSInvalid' || name === 'JWEInvalid' || name === 'JWTInvalid' || name === 'JOSEAlgNotAllowed') return 'malformed';
+    if (name === 'JWTClaimValidationFailed' && err.message.includes('issuer')) return 'issuer_mismatch';
+    if (err.message.startsWith('Token use mismatch')) return 'use_mismatch';
+  }
+  return 'unknown';
+}
+
+export class JweDecryptError extends Error {
+  readonly kind: JweFailureKind;
+  readonly expectedUse: TokenKind;
+  constructor(kind: JweFailureKind, expectedUse: TokenKind) {
+    super('jwe_decrypt_failed');
+    this.name = 'JweDecryptError';
+    this.kind = kind;
+    this.expectedUse = expectedUse;
+  }
+}
+
 async function decryptWithRotation<T extends JWTPayload>(
   jwe: string,
   expectedUse: TokenKind,
@@ -121,7 +159,14 @@ async function decryptWithRotation<T extends JWTPayload>(
       lastErr = err;
     }
   }
-  throw lastErr instanceof Error ? lastErr : new Error('JWE decryption failed');
+  const kind = classifyJweError(lastErr);
+  // Structured line → CloudWatch. No token content, no key material.
+  // Lets ops distinguish "expired traffic" from a signature-attack pattern
+  // without exposing the distinction in any response.
+  process.stderr.write(
+    JSON.stringify({ evt: 'jwe_decrypt_failed', kind, expectedUse }) + '\n',
+  );
+  throw new JweDecryptError(kind, expectedUse);
 }
 
 export function mintAuthCode(
