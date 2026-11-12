@@ -21,7 +21,12 @@ import {
 import { handleRegister } from '../oauth/register.js';
 import { handleAuthorizeGet, handleAuthorizePost } from '../oauth/authorize.js';
 import { handleToken } from '../oauth/token.js';
-import { decryptAccessToken, JWE_ISSUER } from '../oauth/jwe.js';
+import {
+  decryptAccessToken,
+  JWE_ISSUER,
+  MCP_REQUIRED_SCOPE,
+  scopeIncludes,
+} from '../oauth/jwe.js';
 import { rateLimit } from '../oauth/grants.js';
 
 function unauthorizedMcp(): Response {
@@ -42,6 +47,30 @@ function unauthorizedMcp(): Response {
       headers: {
         'content-type': 'application/json',
         'www-authenticate': `Bearer resource_metadata="${JWE_ISSUER}/.well-known/oauth-protected-resource"`,
+      },
+    },
+  );
+}
+
+// 403 for tokens that decrypt but don't carry the scope /mcp requires. RFC 6750
+// §3.1 says to use `insufficient_scope` and advertise the required scope so the
+// client knows what to ask for on its next /authorize.
+function forbiddenInsufficientScope(): Response {
+  return new Response(
+    JSON.stringify({
+      jsonrpc: '2.0',
+      error: {
+        code: -32001,
+        message:
+          `Token lacks the required scope. Request "${MCP_REQUIRED_SCOPE}" at /authorize and try again.`,
+      },
+      id: null,
+    }),
+    {
+      status: 403,
+      headers: {
+        'content-type': 'application/json',
+        'www-authenticate': `Bearer error="insufficient_scope", scope="${MCP_REQUIRED_SCOPE}", resource_metadata="${JWE_ISSUER}/.well-known/oauth-protected-resource"`,
       },
     },
   );
@@ -78,26 +107,45 @@ async function toApiGwResponse(res: Response): Promise<APIGatewayProxyStructured
   return { statusCode: res.status, headers, body: bodyText };
 }
 
-async function extractApiKey(event: APIGatewayProxyEventV2): Promise<string | null> {
+// Outcome of auth on /mcp:
+//   ok              → go serve the MCP request with the resolved Roo key
+//   unauthenticated → 401, send client back through OAuth
+//   insufficient_scope → 403, the token decrypts but doesn't carry mcp:all
+type McpAuth =
+  | { kind: 'ok'; apiKey: string }
+  | { kind: 'unauthenticated' }
+  | { kind: 'insufficient_scope' };
+
+async function authenticateMcp(event: APIGatewayProxyEventV2): Promise<McpAuth> {
   const auth = event.headers['authorization'];
   if (typeof auth === 'string' && auth.toLowerCase().startsWith('bearer ')) {
     try {
       const payload = await decryptAccessToken(auth.slice(7).trim());
-      return payload.rooApiKey;
+      // F01 scope check. The token's `aud` was already verified by
+      // decryptAccessToken (it binds the token to this /mcp resource).
+      if (!scopeIncludes(payload.scope, MCP_REQUIRED_SCOPE)) {
+        return { kind: 'insufficient_scope' };
+      }
+      return { kind: 'ok', apiKey: payload.rooApiKey };
     } catch {
-      return null;
+      return { kind: 'unauthenticated' };
     }
   }
+  // Legacy direct-key path (Claude Desktop/CLI). No OAuth scope to check — the
+  // bearer IS the Roo API key.
   const apiKey = event.headers['x-api-key'];
-  if (typeof apiKey === 'string' && apiKey.length > 0) return apiKey;
-  return null;
+  if (typeof apiKey === 'string' && apiKey.length > 0) {
+    return { kind: 'ok', apiKey };
+  }
+  return { kind: 'unauthenticated' };
 }
 
 async function handleMcp(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyStructuredResultV2> {
-  const apiKey = await extractApiKey(event);
-  if (!apiKey) return toApiGwResponse(unauthorizedMcp());
+  const auth = await authenticateMcp(event);
+  if (auth.kind === 'unauthenticated') return toApiGwResponse(unauthorizedMcp());
+  if (auth.kind === 'insufficient_scope') return toApiGwResponse(forbiddenInsufficientScope());
 
-  const server = buildServer({ apiKey });
+  const server = buildServer({ apiKey: auth.apiKey });
   const transport = new WebStandardStreamableHTTPServerTransport({
     // API Gateway buffers responses; MCP spec allows a single JSON body.
     enableJsonResponse: true,
@@ -181,13 +229,21 @@ export const handler = async (
   if (path === '/.well-known/oauth-protected-resource' && method === 'GET') {
     return toApiGwResponse(protectedResourceMetadata());
   }
-  if (path === '/register') return toApiGwResponse(await handleRegister(toRequest(event)));
-
   // Rate limits on the auth plane (F08). Numbers are per-IP, per-60s. They are
   // deliberately generous for real users (who click through /authorize once)
   // and deliberately cheap for attackers (who need thousands of tries to be
   // useful). Adjust in one place if abuse shifts the shape.
   const ip = clientIp(event);
+
+  // Dynamic Client Registration is unauthenticated and stateless; nothing stops
+  // one IP from generating a million client_ids and burning CPU/log volume.
+  // Cap it tight — honest clients register once.
+  if (path === '/register') {
+    const throttled = await enforceLimit({ bucket: `register:${ip}`, limit: 10, windowSeconds: 60 });
+    if (throttled) return throttled;
+    return toApiGwResponse(await handleRegister(toRequest(event)));
+  }
+
   if (path === '/authorize' && method === 'GET') {
     const throttled = await enforceLimit({ bucket: `authorize_get:${ip}`, limit: 30, windowSeconds: 60 });
     if (throttled) return throttled;

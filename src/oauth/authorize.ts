@@ -13,7 +13,7 @@
 // did NOT initiate this flow (phishing) sees an unfamiliar app name and bails.
 import { randomUUID } from 'node:crypto';
 import { RooClient } from '../roo-client.js';
-import { decryptClientId, mintAuthCode } from './jwe.js';
+import { decryptClientId, DEFAULT_SCOPE, mintAuthCode, MCP_REQUIRED_SCOPE } from './jwe.js';
 import { ROO_ICON_DATA_URL } from '../icon.js';
 
 interface AuthorizeParams {
@@ -66,7 +66,7 @@ function renderErrorPage(title: string, message: string): Response {
   });
   return new Response(html, {
     status: 400,
-    headers: { 'content-type': 'text/html; charset=utf-8' },
+    headers: authorizeSecurityHeaders('text/html; charset=utf-8'),
   });
 }
 
@@ -137,15 +137,30 @@ function renderForm({ params, clientName, redirectHost, error }: FormOptions): R
   `;
   return new Response(pageShell({ title: `Connect ${clientName} to Roo`, bodyHtml }), {
     status: 200,
-    headers: {
-      'content-type': 'text/html; charset=utf-8',
-      'cache-control': 'no-store',
-      // Hard against the authorize page being iframed from another origin — phishing kills.
-      'content-security-policy':
-        "default-src 'self'; img-src data: https:; style-src 'unsafe-inline'; frame-ancestors 'none'",
-      'x-frame-options': 'DENY',
-    },
+    headers: authorizeSecurityHeaders('text/html; charset=utf-8'),
   });
+}
+
+// One place to set the headers that protect the authorize page. F07:
+//   - no-store so an API key typed into the form doesn't sit in the back cache
+//   - CSP frame-ancestors + XFO DENY: can't be iframed → clickjacking dead
+//   - Referrer-Policy: no-referrer: the client's redirect_uri (which may be an
+//     http://localhost CLI helper) must not learn the issuer path, and our form
+//     post URL must not appear in any downstream Referer header
+//   - Permissions-Policy: deny every powerful feature we don't use. The browser
+//     has no reason to let this page open the camera or mic
+function authorizeSecurityHeaders(contentType: string): Record<string, string> {
+  return {
+    'content-type': contentType,
+    'cache-control': 'no-store',
+    'content-security-policy':
+      "default-src 'self'; img-src data: https:; style-src 'unsafe-inline'; frame-ancestors 'none'",
+    'x-frame-options': 'DENY',
+    'referrer-policy': 'no-referrer',
+    'permissions-policy':
+      'accelerometer=(), camera=(), geolocation=(), gyroscope=(), microphone=(), payment=(), usb=()',
+    'x-content-type-options': 'nosniff',
+  };
 }
 
 interface ShellOptions {
@@ -315,6 +330,56 @@ async function resolveClient(
   }
 }
 
+// RFC 8252 §7.3: native OAuth clients that use http://localhost or
+// http://127.0.0.1 as their redirect pick a fresh port on each flow (the OS
+// hands them whatever's free). So a client that registered localhost:34567 may
+// legitimately arrive here with localhost:52001. We accept that, but ONLY for
+// loopback hosts and ONLY if scheme/host/path match a registered URI.
+//
+// Any non-loopback redirect must match exactly — no wiggle room; that's where
+// phishing lives.
+function redirectUriMatches(requested: string, registered: string[]): boolean {
+  if (registered.includes(requested)) return true;
+  let req: URL;
+  try {
+    req = new URL(requested);
+  } catch {
+    return false;
+  }
+  if (req.protocol !== 'http:') return false;
+  if (req.hostname !== 'localhost' && req.hostname !== '127.0.0.1') return false;
+  for (const reg of registered) {
+    let r: URL;
+    try {
+      r = new URL(reg);
+    } catch {
+      continue;
+    }
+    if (
+      r.protocol === req.protocol &&
+      r.hostname === req.hostname &&
+      r.pathname === req.pathname
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// F07: validate the requested scope rather than silently accepting anything.
+// Clients may omit scope (we default) or ask for `mcp:all`; any other token is
+// rejected so a future surprise-scope doesn't quietly become the granted scope.
+function validateRequestedScope(scope: string | null): string | null {
+  if (!scope || scope.trim() === '') return null;
+  const tokens = scope.trim().split(/\s+/);
+  for (const t of tokens) {
+    if (t !== MCP_REQUIRED_SCOPE) {
+      return `Unsupported scope: "${t}". Only "${MCP_REQUIRED_SCOPE}" is available.`;
+    }
+  }
+  return null;
+}
+
 function validateParams(
   params: AuthorizeParams,
   registeredRedirects: string[],
@@ -331,10 +396,19 @@ function validateParams(
   if (!params.redirectUri) {
     return 'Missing redirect_uri.';
   }
-  if (!registeredRedirects.includes(params.redirectUri)) {
+  if (!redirectUriMatches(params.redirectUri, registeredRedirects)) {
     return `redirect_uri "${params.redirectUri}" is not registered for this client.`;
   }
+  const scopeErr = validateRequestedScope(params.scope);
+  if (scopeErr) return scopeErr;
   return null;
+}
+
+// Resolve the scope to persist with this grant. Clients that omit `scope`
+// silently get DEFAULT_SCOPE; clients that pass mcp:all get what they asked
+// for; anything else has already been rejected by validateRequestedScope.
+function resolveGrantedScope(requested: string | null): string {
+  return requested && requested.trim() !== '' ? requested.trim() : DEFAULT_SCOPE;
 }
 
 export async function handleAuthorizeGet(request: Request): Promise<Response> {
@@ -404,6 +478,9 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
     // Unique per code; /token writes a "used" marker keyed on this so a
     // replay gets rejected (F03).
     jti: randomUUID(),
+    // Carry the granted scope into the code so /token can mint access/refresh
+    // tokens with it (F01).
+    scope: resolveGrantedScope(params.scope),
   });
 
   const redirect = new URL(params.redirectUri!);
@@ -412,6 +489,14 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
 
   return new Response(null, {
     status: 302,
-    headers: { location: redirect.toString(), 'cache-control': 'no-store' },
+    headers: {
+      location: redirect.toString(),
+      'cache-control': 'no-store',
+      // Strip Referer when the browser follows this 302 so the client's
+      // redirect_uri doesn't learn which auth-server page the user typed into
+      // (F07). Belt-and-braces: the GET page already sets this, but a 302 is a
+      // fresh response.
+      'referrer-policy': 'no-referrer',
+    },
   });
 }
