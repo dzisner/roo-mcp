@@ -12,6 +12,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import {
   decryptAuthCode,
   decryptRefreshToken,
+  DEFAULT_SCOPE,
   mintAccessToken,
   mintRefreshToken,
 } from './jwe.js';
@@ -39,17 +40,22 @@ interface IssueTokensOpts {
   rooApiKey: string;
   clientId: string;
   familyId: string;
+  scope: string;
 }
 
 async function issueTokens({
   rooApiKey,
   clientId,
   familyId,
+  scope,
 }: IssueTokensOpts): Promise<Response> {
   const refreshJti = randomUUID();
   const [accessToken, refreshToken] = await Promise.all([
-    mintAccessToken({ rooApiKey, clientId }, ACCESS_TTL_SECONDS),
-    mintRefreshToken({ rooApiKey, clientId, jti: refreshJti, familyId }, REFRESH_TTL_SECONDS),
+    mintAccessToken({ rooApiKey, clientId, scope }, ACCESS_TTL_SECONDS),
+    mintRefreshToken(
+      { rooApiKey, clientId, jti: refreshJti, familyId, scope },
+      REFRESH_TTL_SECONDS,
+    ),
   ]);
   return new Response(
     JSON.stringify({
@@ -57,7 +63,7 @@ async function issueTokens({
       token_type: 'Bearer',
       expires_in: ACCESS_TTL_SECONDS,
       refresh_token: refreshToken,
-      scope: 'mcp:all',
+      scope,
     }),
     {
       status: 200,
@@ -107,11 +113,13 @@ async function handleAuthorizationCode(body: URLSearchParams): Promise<Response>
   }
 
   // New grant → new family. Later refresh rotations keep this familyId so
-  // reuse-detection links them together.
+  // reuse-detection links them together. Scope is whatever the code carried,
+  // which is whatever /authorize granted (defaulting to DEFAULT_SCOPE).
   return issueTokens({
     rooApiKey: payload.rooApiKey,
     clientId: payload.clientId,
     familyId: randomUUID(),
+    scope: payload.scope || DEFAULT_SCOPE,
   });
 }
 
@@ -147,6 +155,9 @@ async function handleRefreshToken(body: URLSearchParams): Promise<Response> {
     rooApiKey: payload.rooApiKey,
     clientId: payload.clientId,
     familyId: payload.familyId,
+    // Rotated access/refresh inherit the scope the chain was granted — a client
+    // cannot broaden its scope via a refresh.
+    scope: payload.scope || DEFAULT_SCOPE,
   });
 }
 

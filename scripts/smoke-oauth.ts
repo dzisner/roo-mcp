@@ -13,6 +13,7 @@
 // ROO_MCP_JWE_SECRET isn't set — fine for one-shot local tests.
 import { createHash, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { EncryptJWT } from 'jose';
 
 // Set env BEFORE importing the handler (jwe.ts reads these at module init).
 process.env.ROO_MCP_JWE_KEY ??= randomBytes(32).toString('base64');
@@ -411,7 +412,166 @@ async function main(): Promise<void> {
   }
   console.log('[OK]   /token rate-limits past 30/min with Retry-After');
 
-  // 13. Discovery docs
+  // 13. Insufficient scope — F01. Mint an access token (with the same JWE key the
+  // handler uses) that has an empty scope and the correct aud, and prove /mcp
+  // returns 403 with WWW-Authenticate: insufficient_scope.
+  const jweKey = new Uint8Array(Buffer.from(process.env.ROO_MCP_JWE_KEY!, 'base64'));
+  const nowSec = Math.floor(Date.now() / 1000);
+  const issuer = process.env.ROO_MCP_ISSUER!;
+  const unscopedToken = await new EncryptJWT({
+    rooApiKey,
+    clientId,
+    scope: '',
+    use: 'access',
+  })
+    .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
+    .setIssuer(issuer)
+    .setAudience(`${issuer}/mcp`)
+    .setIssuedAt(nowSec)
+    .setExpirationTime(nowSec + 600)
+    .encrypt(jweKey);
+  const insufficientResp = await handler(
+    makeEvent({
+      method: 'POST',
+      path: '/mcp',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+        authorization: `Bearer ${unscopedToken}`,
+      },
+      body: '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"x","version":"0"}}}',
+    }),
+  );
+  expectStatus('insufficient-scope → 403', insufficientResp, 403);
+  const wwwAuth2 = insufficientResp.headers?.['www-authenticate'] ?? insufficientResp.headers?.['WWW-Authenticate'];
+  if (typeof wwwAuth2 !== 'string' || !wwwAuth2.includes('insufficient_scope')) {
+    console.error('[FAIL] 403 missing WWW-Authenticate: insufficient_scope');
+    console.error('  wwwAuth:', wwwAuth2);
+    process.exit(1);
+  }
+  console.log('[OK]   403 carries WWW-Authenticate: insufficient_scope');
+
+  // 14. Audience binding — F01. A token minted for a DIFFERENT audience must be
+  // rejected by /mcp (which falls back to a 401 because decryption/claim
+  // validation fails — same code path as a tampered token).
+  const wrongAudToken = await new EncryptJWT({
+    rooApiKey,
+    clientId,
+    scope: 'mcp:all',
+    use: 'access',
+  })
+    .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
+    .setIssuer(issuer)
+    .setAudience(`${issuer}/admin`)
+    .setIssuedAt(nowSec)
+    .setExpirationTime(nowSec + 600)
+    .encrypt(jweKey);
+  const wrongAudResp = await handler(
+    makeEvent({
+      method: 'POST',
+      path: '/mcp',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+        authorization: `Bearer ${wrongAudToken}`,
+      },
+      body: '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"x","version":"0"}}}',
+    }),
+  );
+  expectStatus('wrong-audience → 401', wrongAudResp, 401);
+  console.log('[OK]   token with wrong aud is rejected');
+
+  // 15. Loopback-port tolerance — F07. Register at localhost:9999, authorize
+  // from localhost:50001. RFC 8252 §7.3 says this must work.
+  const loopbackReg = await handler(
+    makeEvent({
+      method: 'POST',
+      path: '/register',
+      headers: { 'content-type': 'application/json', host: 'localhost-rp' },
+      body: JSON.stringify({
+        redirect_uris: ['http://localhost:9999/callback'],
+        client_name: 'LoopbackCli',
+        token_endpoint_auth_method: 'none',
+      }),
+    }),
+  );
+  expectStatus('loopback register', loopbackReg, 201);
+  const loopbackClient = (JSON.parse(loopbackReg.body ?? '{}') as { client_id: string }).client_id;
+  const differentPort = 'http://localhost:50001/callback';
+  const loopbackGet = await handler(
+    makeEvent({
+      method: 'GET',
+      path: '/authorize',
+      queryString: new URLSearchParams({
+        response_type: 'code',
+        client_id: loopbackClient,
+        redirect_uri: differentPort,
+        code_challenge: challenge,
+        code_challenge_method: 'S256',
+      }).toString(),
+      // Different source IP so we don't trip the 30/min authorize GET bucket.
+      headers: { 'x-forwarded-for': '198.51.100.44' },
+    }),
+  );
+  expectStatus('loopback different-port accepted', loopbackGet, 200);
+  console.log('[OK]   RFC 8252 loopback-port tolerance works');
+
+  // 16. Scope validation — F07. Reject unknown scope value at /authorize.
+  const badScopeGet = await handler(
+    makeEvent({
+      method: 'GET',
+      path: '/authorize',
+      queryString: new URLSearchParams({
+        response_type: 'code',
+        client_id: clientId,
+        redirect_uri: REDIRECT_URI,
+        code_challenge: challenge,
+        code_challenge_method: 'S256',
+        scope: 'mcp:evil',
+      }).toString(),
+      headers: { 'x-forwarded-for': '198.51.100.55' },
+    }),
+  );
+  expectStatus('unknown scope rejected', badScopeGet, 400);
+  if (!badScopeGet.body?.toLowerCase().includes('unsupported scope')) {
+    console.error('[FAIL] unknown scope did not surface a clear error');
+    process.exit(1);
+  }
+  console.log('[OK]   unknown scope rejected with a clear message');
+
+  // 17. Referrer-Policy on /authorize — F07.
+  const refPolicy =
+    loopbackGet.headers?.['referrer-policy'] ?? loopbackGet.headers?.['Referrer-Policy'];
+  if (refPolicy !== 'no-referrer') {
+    console.error(`[FAIL] authorize GET missing Referrer-Policy: no-referrer (got ${String(refPolicy)})`);
+    process.exit(1);
+  }
+  console.log('[OK]   authorize GET sets Referrer-Policy: no-referrer');
+
+  // 18. /register rate limit — F07. 10/min per IP. Register a fresh IP so we're
+  // isolated from the loopbackReg burst above.
+  let registerThrottled = false;
+  for (let i = 0; i < 15; i++) {
+    const r = await handler(
+      makeEvent({
+        method: 'POST',
+        path: '/register',
+        headers: { 'content-type': 'application/json', 'x-forwarded-for': '198.51.100.77' },
+        body: JSON.stringify({ redirect_uris: ['http://localhost:9000/cb'], client_name: 'Spam' }),
+      }),
+    );
+    if (r.statusCode === 429) {
+      registerThrottled = true;
+      break;
+    }
+  }
+  if (!registerThrottled) {
+    console.error('[FAIL] /register did not rate-limit within 15 requests');
+    process.exit(1);
+  }
+  console.log('[OK]   /register rate-limits past 10/min');
+
+  // 19. Discovery docs
   const authSvr = await handler(
     makeEvent({ method: 'GET', path: '/.well-known/oauth-authorization-server' }),
   );
