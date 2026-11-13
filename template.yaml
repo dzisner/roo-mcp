@@ -56,35 +56,19 @@ Resources:
         EndpointConfiguration: REGIONAL
         SecurityPolicy: TLS_1_2
       DisableExecuteApiEndpoint: false   # keep the *.execute-api.* URL for pre-DNS testing
-      # F08 (Wave 8): API Gateway stage-level throttles. These sit IN FRONT OF
-      # the per-IP DDB counters in src/oauth/grants.ts — the two layers are
+      # F08 (Wave 8): API Gateway stage-level throttle. Sits IN FRONT OF the
+      # per-IP DDB counters in src/oauth/grants.ts — the two layers are
       # complementary:
       #   - stage throttle = cheap, account-wide DoS cap. Rejects at the edge
       #     with a 429 before invoking the Lambda or touching DDB.
       #   - DDB counter    = per-IP policy enforcement. Lets a flood from one
       #     IP burn its own quota without taking down service for others.
-      # Route overrides tighten the auth-plane endpoints (which are the
-      # expensive paths: DCR is unauthenticated and stateless; /authorize POST
-      # hits the Roo API to validate the key).
+      # The API only exposes one route (ANY /{proxy+}) — the Lambda does the
+      # internal routing — so per-endpoint throttles can't be set as
+      # RouteSettings. Per-endpoint tightening happens in grants.ts.
       DefaultRouteSettings:
         ThrottlingBurstLimit: 200
         ThrottlingRateLimit: 100
-      RouteSettings:
-        'POST /register':
-          ThrottlingBurstLimit: 20
-          ThrottlingRateLimit: 5
-        'POST /authorize':
-          ThrottlingBurstLimit: 30
-          ThrottlingRateLimit: 10
-        'GET /authorize':
-          ThrottlingBurstLimit: 60
-          ThrottlingRateLimit: 20
-        'POST /token':
-          ThrottlingBurstLimit: 60
-          ThrottlingRateLimit: 30
-        'POST /mcp':
-          ThrottlingBurstLimit: 300
-          ThrottlingRateLimit: 100
 
   # OAuth grants + rate-limit counters. One single-table-design table, partitioned
   # by a prefixed `pk` (code#..., refresh#..., family#..., rl#...). TTL on the

@@ -551,10 +551,11 @@ async function run(): Promise<void> {
     assert('F10', 'package.json name is @roo-bz/roo-mcp', pkg.name === '@roo-bz/roo-mcp');
   }
 
-  // --- F08 (Wave 8): template.yaml declares stage-level throttles. Static
-  // check — the live limits are AWS-side and would require a deployed stack
-  // to probe. What we can enforce from CI is that the config doesn't
-  // regress out of the template.
+  // --- F08 (Wave 8): template.yaml declares a stage-level default throttle.
+  // Static check — live limits are AWS-side and need a deployed stack to
+  // probe. Per-route overrides aren't possible under ANY /{proxy+}, so the
+  // single DefaultRouteSettings is the lever; the per-IP DDB counters in
+  // grants.ts provide per-endpoint tightening.
   {
     const fs = await import('node:fs/promises');
     const tpl = await fs.readFile(new URL('../template.yaml', import.meta.url), 'utf8');
@@ -563,13 +564,6 @@ async function run(): Promise<void> {
       'template.yaml has DefaultRouteSettings with ThrottlingRateLimit',
       /DefaultRouteSettings:\s*\n\s*ThrottlingBurstLimit:\s*\d+\s*\n\s*ThrottlingRateLimit:\s*\d+/.test(tpl),
     );
-    for (const route of ['POST /register', 'POST /authorize', 'POST /token', 'POST /mcp']) {
-      assert(
-        'F08',
-        `template.yaml tightens ${route}`,
-        tpl.includes(`'${route}':`) || tpl.includes(`"${route}":`),
-      );
-    }
   }
 
   // --- F10 (Wave 8): /health surfaces version + sha so a client can tell
