@@ -15,7 +15,11 @@ if [[ -z "$API_KEY" ]]; then
 fi
 
 pass() { printf '  \033[32m✓\033[0m %s\n' "$1"; }
-fail() { printf '  \033[31m✗\033[0m %s\n     %s\n' "$1" "$2" >&2; exit 1; }
+# Scrub the live API key out of any text we print — a misbehaving server could
+# echo the request back in an error body, and these logs may land in CI output
+# or shared terminals.
+scrub() { sed -e "s|$API_KEY|***REDACTED***|g"; }
+fail() { printf '  \033[31m✗\033[0m %s\n     %s\n' "$1" "$(printf '%s' "$2" | scrub)" >&2; exit 1; }
 
 echo "roo-mcp smoke test against $BASE_URL"
 echo

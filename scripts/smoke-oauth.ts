@@ -86,10 +86,25 @@ function makeEvent({
   } as Event;
 }
 
+// Known-sensitive values set at runtime. Any time we print a response body
+// (which may echo request bits back from a misbehaving server), scrub these
+// so a failed smoke run can't paste the user's live API key into CI logs,
+// terminal scrollback, or a chat.
+const SENSITIVE: string[] = [];
+function registerSensitive(v: string | undefined): void {
+  if (v && v.length >= 8 && !SENSITIVE.includes(v)) SENSITIVE.push(v);
+}
+function scrub(s: string | undefined): string {
+  if (!s) return '';
+  let out = s;
+  for (const v of SENSITIVE) out = out.split(v).join('***REDACTED***');
+  return out;
+}
+
 function expectStatus(label: string, resp: Result, expected: number): void {
   if (resp.statusCode !== expected) {
     console.error(`[FAIL] ${label}: expected ${expected}, got ${resp.statusCode}`);
-    console.error('  body:', resp.body?.slice(0, 500));
+    console.error('  body:', scrub(resp.body?.slice(0, 500)));
     process.exit(1);
   }
   console.log(`[OK]   ${label}: ${resp.statusCode}`);
@@ -97,6 +112,7 @@ function expectStatus(label: string, resp: Result, expected: number): void {
 
 async function main(): Promise<void> {
   const rooApiKey = loadRooApiKey();
+  registerSensitive(rooApiKey);
   const REDIRECT_URI = 'http://localhost:9999/callback';
   const CLIENT_NAME = 'SmokeTest';
 
@@ -198,6 +214,8 @@ async function main(): Promise<void> {
     console.error('[FAIL] missing tokens in response');
     process.exit(1);
   }
+  registerSensitive(tokens.access_token);
+  registerSensitive(tokens.refresh_token);
   console.log(`[OK]   access_token length: ${tokens.access_token.length}, expires_in: ${tokens.expires_in}`);
 
   // 6. POST /mcp with Bearer — initialize
@@ -269,7 +287,7 @@ async function main(): Promise<void> {
   expectStatus('mcp roo_whoami (Bearer)', callResp, 200);
   if (!callResp.body?.includes('Roo account:')) {
     console.error('[FAIL] roo_whoami did not return account summary');
-    console.error('  body:', callResp.body?.slice(0, 500));
+    console.error('  body:', scrub(callResp.body?.slice(0, 500)));
     process.exit(1);
   }
   console.log('[OK]   roo_whoami returned account summary');

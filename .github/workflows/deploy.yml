@@ -24,10 +24,13 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
+      # Non-secret config is fine at job scope.
       AWS_REGION: ${{ vars.AWS_REGION }}
       CERTIFICATE_ARN: ${{ vars.CERTIFICATE_ARN }}
-      JWE_KEY: ${{ secrets.JWE_KEY }}
-      JWE_KEY_PREVIOUS: ${{ secrets.JWE_KEY_PREVIOUS }}
+      # Deliberately NOT setting JWE_KEY / JWE_KEY_PREVIOUS here —
+      # a job-level env exposes secrets to every step, including `npm ci`,
+      # where a malicious transitive postinstall script could exfiltrate them.
+      # They are injected only into the one step that needs them (SAM deploy).
     steps:
       - uses: actions/checkout@v4
 
@@ -63,6 +66,10 @@ jobs:
         run: sam build
 
       - name: SAM deploy
+        env:
+          # Scope the JWE secrets to this one step. See job-level env note above.
+          JWE_KEY: ${{ secrets.JWE_KEY }}
+          JWE_KEY_PREVIOUS: ${{ secrets.JWE_KEY_PREVIOUS }}
         run: |
           PARAMS=("CertificateArn=$CERTIFICATE_ARN" "JweKey=$JWE_KEY")
           # SAM rejects "Key=" with no value, so only pass JweKeyPrevious when actually rotating.

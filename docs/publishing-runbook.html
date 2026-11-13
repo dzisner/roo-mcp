@@ -373,7 +373,7 @@
   <h1>roo-mcp</h1>
   <p>Operator's guide for shipping releases of the Roo shortlink MCP server to npm. Not intended for end users — for that see the README.</p>
   <p class="meta">
-    <span><b>Package</b> roo-mcp</span>
+    <span><b>Package</b> @roo-bz/roo-mcp</span>
     <span><b>Registry</b> npmjs.com</span>
     <span><b>Repo</b> C:\Users\User\Roo MCP</span>
     <span><b>Node</b> ≥ 18</span>
@@ -517,13 +517,13 @@
   <ol class="steps">
     <li><div>
       <h3>Registry sees the new version</h3>
-<pre><span class="p">&gt;</span> npm view roo-mcp version
+<pre><span class="p">&gt;</span> npm view @roo-bz/roo-mcp version
 <span class="c"># → 0.1.1  (or whatever you just published)</span></pre>
     </div></li>
 
     <li><div>
       <h3>A fresh <code>npx</code> install actually runs</h3>
-<pre><span class="p">&gt;</span> npx --yes roo-mcp@0.1.1
+<pre><span class="p">&gt;</span> npx --yes @roo-bz/roo-mcp@0.1.1
 <span class="c"># exits with "ROO_API_KEY is not set" — that's success</span></pre>
       <p>Reaching the "key not set" message means npm found the tarball, downloaded it, and Node loaded <code>dist/index.js</code>. Any other failure — 404, module-not-found, syntax error — means the release is broken and needs a rollback.</p>
     </div></li>
@@ -548,7 +548,7 @@
 <span class="c">// after — installed from npm</span>
 "roo": {
   "command": "npx",
-  "args": ["-y", "roo-mcp"],
+  "args": ["-y", "@roo-bz/roo-mcp"],
   "env": { "ROO_API_KEY": "your-key" }
 }</pre>
     </div></li>
@@ -583,9 +583,9 @@
   <ol class="steps">
     <li><div>
       <h3>Deprecate the bad version</h3>
-<pre><span class="p">&gt;</span> npm deprecate roo-mcp@0.1.1 \
+<pre><span class="p">&gt;</span> npm deprecate @roo-bz/roo-mcp@0.1.1 \
   <span class="c">"Buggy — please upgrade to 0.1.2+"</span></pre>
-      <p>The tarball stays installable, but every <code>npm install</code>/<code>npx</code> for that version prints the warning message. Users on it will notice; new installs of <code>npx roo-mcp</code> without a pinned version won't pick it up as long as a newer version exists.</p>
+      <p>The tarball stays installable, but every <code>npm install</code>/<code>npx</code> for that version prints the warning message. Users on it will notice; new installs of <code>npx @roo-bz/roo-mcp</code> without a pinned version won't pick it up as long as a newer version exists.</p>
     </div></li>
 
     <li><div>
