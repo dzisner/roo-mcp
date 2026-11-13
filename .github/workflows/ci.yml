@@ -1,0 +1,46 @@
+name: CI
+
+# Verify every push and pull request. No AWS credentials, no deploy capability.
+# A PR branch cannot reach production from this workflow — deploy.yml is the
+# only path to AWS and it runs only on pushes to main.
+#
+# Pair this with a branch-protection rule on main that requires "CI / verify"
+# to pass before merge; that makes the gate a hard requirement, not a courtesy.
+
+on:
+  push:
+    branches-ignore: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Security regression gate
+        # Pinned to F01-F12 in SECURITY.md. Each wave PR adds assertions here
+        # for the behavior it introduces. Runs purely in-process — no network,
+        # no AWS.
+        run: npm run test:gate

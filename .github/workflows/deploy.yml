@@ -1,5 +1,11 @@
 name: Deploy MCP (Lambda + HTTP API)
 
+# Deploys to AWS. Runs ONLY on push-to-main (plus manual dispatch).
+# Verification lives in ci.yml, which runs on every push/PR without AWS
+# credentials — merge to main is gated by that workflow via branch protection.
+# This workflow re-runs typecheck/build as defense-in-depth so a broken main
+# cannot ship even if someone bypasses the gate.
+
 on:
   push:
     branches: [main]
