@@ -27,10 +27,10 @@ Wave-6 through Wave-9 map to `scratchpad/Revised F01-F12 remediation plan.docx`
 | F05 | Shortlink IDs must be validated against the Roo alphabet/length before hitting the API                | Done    | 6    | `validateRooId` enforces base64 alphabet + length 4-256; `encodeRooId` runs it on every call.         |
 | F06 | Retire the unused Node HTTP transport (`src/http/node-server.ts`)                                     | Done    | 1    | Removed in wave-1 (473da95).                                                                          |
 | F07 | `/authorize` must carry CSP, Referrer-Policy, be CSRF-safe, enforce loopback-port tolerance           | Done    | 7    | Headers, loopback tolerance, RFC 8707 resource binding, redirect-back error contract per §4.1.2.1.    |
-| F08 | Rate-limit the OAuth plane (`/register`, `/authorize`, `/token`)                                      | Partial | 8    | App-layer limits via DDB counters live. Migration to API Gateway stage throttles pending.             |
+| F08 | Rate-limit the OAuth plane (`/register`, `/authorize`, `/token`)                                      | Done    | 8    | Two layers: API Gateway stage throttles (edge DoS cap) + per-IP DDB counters (per-source policy).     |
 | F09 | Deploy pipeline must not run with AWS credentials on PR branches                                      | Done    | 5    | Split into `.github/workflows/ci.yml` (no secrets) + `deploy.yml` (push-to-main only).                |
-| F10 | Published npm package name is scoped (`@roo-bz/roo-mcp`), docs and install snippets match             | Partial | 8    | Package.json correct; release identity across `main` / npm tag reconcile still pending.               |
-| F11 | OAuth / `/mcp` error paths must not leak crypto errors or stack traces                                | Partial | 8    | JWE decrypt failures normalize to 401. Rotation runbook and HTTP API throttle migration pending.      |
+| F10 | Published npm package name is scoped (`@roo-bz/roo-mcp`), docs and install snippets match             | Done    | 8    | /health exposes version + build SHA so a client can verify which build is live.                       |
+| F11 | OAuth / `/mcp` error paths must not leak crypto errors or stack traces                                | Done    | 8    | JWE decrypt failures normalize to 401; rotation runbook in [ROTATION.md](ROTATION.md).                |
 | F12 | MCP tool annotations (`readOnlyHint` / `destructiveHint` / `idempotentHint` / `openWorldHint`) audit  | Done    | 6    | All 14 tools annotated; gate asserts coverage per file.                                               |
 
 ## Known gaps

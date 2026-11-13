@@ -23,6 +23,19 @@ Parameters:
     Description: >
       Optional. Previous value of JweKey during a rotation. Decrypt accepts tokens
       minted under either key; mint uses JweKey only. Leave empty when not rotating.
+  BuildVersion:
+    Type: String
+    Default: unknown
+    Description: >
+      F10 (Wave 8). The npm package version this Lambda was built from
+      (package.json). Surfaced on /health so clients can tell which build is
+      live. Set by the deploy workflow.
+  BuildSha:
+    Type: String
+    Default: unknown
+    Description: >
+      F10 (Wave 8). The git commit SHA this Lambda was built from. Surfaced on
+      /health. Set by the deploy workflow from github.sha.
 
 Globals:
   Function:
@@ -43,6 +56,35 @@ Resources:
         EndpointConfiguration: REGIONAL
         SecurityPolicy: TLS_1_2
       DisableExecuteApiEndpoint: false   # keep the *.execute-api.* URL for pre-DNS testing
+      # F08 (Wave 8): API Gateway stage-level throttles. These sit IN FRONT OF
+      # the per-IP DDB counters in src/oauth/grants.ts — the two layers are
+      # complementary:
+      #   - stage throttle = cheap, account-wide DoS cap. Rejects at the edge
+      #     with a 429 before invoking the Lambda or touching DDB.
+      #   - DDB counter    = per-IP policy enforcement. Lets a flood from one
+      #     IP burn its own quota without taking down service for others.
+      # Route overrides tighten the auth-plane endpoints (which are the
+      # expensive paths: DCR is unauthenticated and stateless; /authorize POST
+      # hits the Roo API to validate the key).
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 200
+        ThrottlingRateLimit: 100
+      RouteSettings:
+        'POST /register':
+          ThrottlingBurstLimit: 20
+          ThrottlingRateLimit: 5
+        'POST /authorize':
+          ThrottlingBurstLimit: 30
+          ThrottlingRateLimit: 10
+        'GET /authorize':
+          ThrottlingBurstLimit: 60
+          ThrottlingRateLimit: 20
+        'POST /token':
+          ThrottlingBurstLimit: 60
+          ThrottlingRateLimit: 30
+        'POST /mcp':
+          ThrottlingBurstLimit: 300
+          ThrottlingRateLimit: 100
 
   # OAuth grants + rate-limit counters. One single-table-design table, partitioned
   # by a prefixed `pk` (code#..., refresh#..., family#..., rl#...). TTL on the
@@ -83,6 +125,8 @@ Resources:
           ROO_MCP_JWE_KEY_PREVIOUS: !Ref JweKeyPrevious
           ROO_MCP_ISSUER: !Sub 'https://${DomainName}'
           ROO_MCP_GRANTS_TABLE: !Ref RooMcpGrantsTable
+          ROO_MCP_VERSION: !Ref BuildVersion
+          ROO_MCP_BUILD_SHA: !Ref BuildSha
       Policies:
         # Minimum needed by src/oauth/grants.ts: PutItem (conditional + unconditional),
         # GetItem (family revoke check), UpdateItem (rate-limit counter). No Delete,

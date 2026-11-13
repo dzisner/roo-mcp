@@ -69,8 +69,16 @@ jobs:
         run: sam build
 
       - name: SAM deploy
+        env:
+          BUILD_SHA: ${{ github.sha }}
         run: |
-          PARAMS=("CertificateArn=$CERTIFICATE_ARN" "JweKey=$JWE_KEY")
+          BUILD_VERSION=$(node -p "require('./package.json').version")
+          PARAMS=(
+            "CertificateArn=$CERTIFICATE_ARN"
+            "JweKey=$JWE_KEY"
+            "BuildVersion=$BUILD_VERSION"
+            "BuildSha=$BUILD_SHA"
+          )
           # SAM rejects "Key=" with no value, so only pass JweKeyPrevious when actually rotating.
           [[ -n "$JWE_KEY_PREVIOUS" ]] && PARAMS+=("JweKeyPrevious=$JWE_KEY_PREVIOUS")
           sam deploy \

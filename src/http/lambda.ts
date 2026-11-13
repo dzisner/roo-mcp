@@ -244,10 +244,18 @@ export const handler = async (
   const path = event.rawPath || '/';
 
   if (path === '/health') {
+    // F10 (Wave 8): surface the package version + build SHA so a client can
+    // tell exactly which build is live without reading CloudWatch. Both are
+    // injected by the deploy workflow from package.json + github.sha; unset
+    // in local runs shows 'unknown'.
     return {
       statusCode: 200,
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ok: true }),
+      headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+      body: JSON.stringify({
+        ok: true,
+        version: process.env.ROO_MCP_VERSION ?? 'unknown',
+        sha: process.env.ROO_MCP_BUILD_SHA ?? 'unknown',
+      }),
     };
   }
 

@@ -551,6 +551,60 @@ async function run(): Promise<void> {
     assert('F10', 'package.json name is @roo-bz/roo-mcp', pkg.name === '@roo-bz/roo-mcp');
   }
 
+  // --- F08 (Wave 8): template.yaml declares stage-level throttles. Static
+  // check — the live limits are AWS-side and would require a deployed stack
+  // to probe. What we can enforce from CI is that the config doesn't
+  // regress out of the template.
+  {
+    const fs = await import('node:fs/promises');
+    const tpl = await fs.readFile(new URL('../template.yaml', import.meta.url), 'utf8');
+    assert(
+      'F08',
+      'template.yaml has DefaultRouteSettings with ThrottlingRateLimit',
+      /DefaultRouteSettings:\s*\n\s*ThrottlingBurstLimit:\s*\d+\s*\n\s*ThrottlingRateLimit:\s*\d+/.test(tpl),
+    );
+    for (const route of ['POST /register', 'POST /authorize', 'POST /token', 'POST /mcp']) {
+      assert(
+        'F08',
+        `template.yaml tightens ${route}`,
+        tpl.includes(`'${route}':`) || tpl.includes(`"${route}":`),
+      );
+    }
+  }
+
+  // --- F10 (Wave 8): /health surfaces version + sha so a client can tell
+  // exactly which build is live.
+  {
+    process.env.ROO_MCP_VERSION = '9.9.9-test';
+    process.env.ROO_MCP_BUILD_SHA = 'deadbeef';
+    const res = await handler(mkEvent({ path: '/health', method: 'GET' }));
+    const body = JSON.parse(String(res.body ?? '{}'));
+    assert('F10', '/health → 200', res.statusCode === 200);
+    assert('F10', '/health exposes version', body.version === '9.9.9-test');
+    assert('F10', '/health exposes sha', body.sha === 'deadbeef');
+    delete process.env.ROO_MCP_VERSION;
+    delete process.env.ROO_MCP_BUILD_SHA;
+  }
+
+  // --- F11 (Wave 8): ROTATION.md exists and documents the two rotation flows.
+  {
+    const fs = await import('node:fs/promises');
+    let doc = '';
+    try {
+      doc = await fs.readFile(new URL('../ROTATION.md', import.meta.url), 'utf8');
+    } catch {
+      /* missing — handled by the next assert */
+    }
+    assert('F11', 'ROTATION.md exists', doc.length > 0);
+    assert('F11', 'ROTATION.md covers JWE key rotation', /JWE encryption key/i.test(doc));
+    assert('F11', 'ROTATION.md covers runtime rotation', /Lambda runtime/i.test(doc));
+    assert(
+      'F11',
+      'ROTATION.md references the 90-day window',
+      /90[-\s]?days?/i.test(doc),
+    );
+  }
+
   // --- Summary
   console.log(`\nPass: ${passes}   Fail: ${failures}\n`);
   if (failures > 0) {
