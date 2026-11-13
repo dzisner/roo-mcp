@@ -20,9 +20,18 @@ const { handler } = await import('../src/http/lambda.js');
 const { markCodeUsed, rotateRefresh, __resetMemoryStoreForTests } = await import(
   '../src/oauth/grants.js'
 );
-const { mintAccessToken, MCP_REQUIRED_SCOPE } = await import('../src/oauth/jwe.js');
+const {
+  mintAccessToken,
+  mintAuthCode,
+  mintRefreshToken,
+  MCP_REQUIRED_SCOPE,
+  MCP_RESOURCE,
+  JWE_ISSUER,
+} = await import('../src/oauth/jwe.js');
 const { redactAddOnForModel } = await import('../src/tools/redact.js');
 const { encodeRooId, validateRooId } = await import('../src/roo-client.js');
+const { EncryptJWT } = await import('jose');
+import { randomUUID, createHash, randomBytes } from 'node:crypto';
 
 import type {
   APIGatewayProxyEventV2,
@@ -330,6 +339,205 @@ async function run(): Promise<void> {
         toolCount > 0 && annotationCount >= toolCount,
       );
     }
+  }
+
+  // --- F03 (Wave 7): a code is consumed on FIRST redemption attempt, even if
+  // the attempt fails PKCE. A later attempt with the correct verifier must
+  // then fail with "already used".
+  {
+    __resetMemoryStoreForTests();
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const code = await mintAuthCode({
+      rooApiKey: 'rk_test',
+      codeChallenge: challenge,
+      codeChallengeMethod: 'S256',
+      redirectUri: 'http://localhost:9999/cb',
+      clientId: 'c_test',
+      jti: randomUUID(),
+      scope: MCP_REQUIRED_SCOPE,
+      resource: MCP_RESOURCE,
+    });
+    const tokenBody = (verifierToSend: string): URLSearchParams =>
+      new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: 'http://localhost:9999/cb',
+        client_id: 'c_test',
+        code_verifier: verifierToSend,
+      });
+    // First attempt: WRONG verifier → fails. Code must still be burned.
+    const first = await handler(
+      mkEvent({
+        path: '/token',
+        method: 'POST',
+        body: tokenBody('wrong-verifier-string-32chars-ok').toString(),
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      }),
+    );
+    assert('F03', 'bad PKCE on code redemption → 400', first.statusCode === 400);
+    // Second attempt: RIGHT verifier. Must now fail as replayed-code.
+    const second = await handler(
+      mkEvent({
+        path: '/token',
+        method: 'POST',
+        body: tokenBody(verifier).toString(),
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      }),
+    );
+    const secondBody = JSON.parse(String(second.body ?? '{}'));
+    assert(
+      'F03',
+      'correct PKCE on same code after bad attempt → already-used',
+      second.statusCode === 400 && /already been used/i.test(String(secondBody.error_description)),
+      `body: ${second.body}`,
+    );
+  }
+
+  // --- F02 (Wave 7): client_id is REQUIRED on refresh grant.
+  {
+    __resetMemoryStoreForTests();
+    const res = await handler(
+      mkEvent({
+        path: '/token',
+        method: 'POST',
+        body: 'grant_type=refresh_token&refresh_token=anything',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      }),
+    );
+    const body = JSON.parse(String(res.body ?? '{}'));
+    assert('F02', 'refresh without client_id → invalid_request', body.error === 'invalid_request');
+  }
+
+  // --- F02 (Wave 7): refresh must match the client_id it was issued to.
+  {
+    __resetMemoryStoreForTests();
+    const refresh = await mintRefreshToken({
+      rooApiKey: 'rk_test',
+      clientId: 'c_original',
+      jti: randomUUID(),
+      familyId: randomUUID(),
+      scope: MCP_REQUIRED_SCOPE,
+    });
+    const res = await handler(
+      mkEvent({
+        path: '/token',
+        method: 'POST',
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: refresh,
+          client_id: 'c_different',
+        }).toString(),
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      }),
+    );
+    const body = JSON.parse(String(res.body ?? '{}'));
+    assert(
+      'F02',
+      'refresh with wrong client_id → invalid_grant',
+      res.statusCode === 400 && body.error === 'invalid_grant',
+    );
+  }
+
+  // --- F02 (Wave 7): refresh without v: 2 (legacy / pre-schema-rotation) is
+  // rejected. Build a v: 1 token directly with jose to bypass the auto-stamp.
+  {
+    __resetMemoryStoreForTests();
+    const key = Buffer.from(process.env.ROO_MCP_JWE_KEY!, 'base64');
+    const legacy = await new EncryptJWT({
+      rooApiKey: 'rk_test',
+      clientId: 'c_test',
+      jti: randomUUID(),
+      familyId: randomUUID(),
+      scope: MCP_REQUIRED_SCOPE,
+      v: 1,
+      use: 'refresh',
+    })
+      .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
+      .setIssuer(JWE_ISSUER)
+      .setIssuedAt()
+      .setExpirationTime('30d')
+      .encrypt(new Uint8Array(key));
+    const res = await handler(
+      mkEvent({
+        path: '/token',
+        method: 'POST',
+        body: new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: legacy,
+          client_id: 'c_test',
+        }).toString(),
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      }),
+    );
+    const body = JSON.parse(String(res.body ?? '{}'));
+    assert(
+      'F02',
+      'legacy-v1 refresh rejected with reconnect hint',
+      res.statusCode === 400 && /reconnect/i.test(String(body.error_description)),
+    );
+  }
+
+  // --- F07 (Wave 7): invalid scope on /authorize bounces back to redirect_uri
+  // with error=invalid_scope (OAuth 2.1 §4.1.2.1 — redirectable error) rather
+  // than rendering an HTML page the client's own UI can't see.
+  {
+    // First register a client so we have a valid client_id + redirect_uri.
+    const regRes = await handler(
+      mkEvent({
+        path: '/register',
+        method: 'POST',
+        body: JSON.stringify({
+          redirect_uris: ['http://localhost:9999/cb'],
+          client_name: 'gate-test',
+        }),
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    const reg = JSON.parse(String(regRes.body ?? '{}'));
+    const clientIdJwe = reg.client_id;
+    const query = new URLSearchParams({
+      response_type: 'code',
+      client_id: clientIdJwe,
+      redirect_uri: 'http://localhost:9999/cb',
+      code_challenge: 'x'.repeat(43),
+      code_challenge_method: 'S256',
+      scope: 'bogus:scope',
+      state: 'state-xyz',
+    }).toString();
+    const res = await handler(mkEvent({ path: '/authorize', method: 'GET', query }));
+    const loc = (res.headers as Record<string, string>)?.['location'] ?? '';
+    assert('F07', 'bad scope → 302 redirect-back', res.statusCode === 302, `got ${res.statusCode}`);
+    assert('F07', 'bad scope redirect carries error=invalid_scope', /error=invalid_scope/.test(loc), loc);
+    assert('F07', 'bad scope redirect carries state', /state=state-xyz/.test(loc), loc);
+  }
+
+  // --- F07 (Wave 7): unsupported resource → 302 error=invalid_target.
+  {
+    const regRes = await handler(
+      mkEvent({
+        path: '/register',
+        method: 'POST',
+        body: JSON.stringify({
+          redirect_uris: ['http://localhost:9999/cb'],
+          client_name: 'gate-test',
+        }),
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    const reg = JSON.parse(String(regRes.body ?? '{}'));
+    const query = new URLSearchParams({
+      response_type: 'code',
+      client_id: reg.client_id,
+      redirect_uri: 'http://localhost:9999/cb',
+      code_challenge: 'x'.repeat(43),
+      code_challenge_method: 'S256',
+      resource: 'https://wrong.example.com/api',
+    }).toString();
+    const res = await handler(mkEvent({ path: '/authorize', method: 'GET', query }));
+    const loc = (res.headers as Record<string, string>)?.['location'] ?? '';
+    assert('F07', 'wrong resource → 302 redirect-back', res.statusCode === 302);
+    assert('F07', 'wrong resource carries error=invalid_target', /error=invalid_target/.test(loc), loc);
   }
 
   // --- F10: package.json uses the scoped name clients will install.

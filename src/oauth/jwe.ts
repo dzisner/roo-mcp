@@ -81,6 +81,10 @@ export interface AuthCodePayload extends JWTPayload {
   // Space-separated OAuth scope string the client asked for and we granted.
   // Carried forward into the access token so /mcp can enforce it (F01).
   scope: string;
+  // RFC 8707 resource indicator — the resource the eventual access token
+  // targets. Today this is always MCP_RESOURCE; recorded on the code so a
+  // future multi-resource server can bind the exchange explicitly (F07).
+  resource: string;
   use: 'code';
 }
 
@@ -92,6 +96,12 @@ export interface AccessTokenPayload extends JWTPayload {
   scope: string;
   use: 'access';
 }
+
+// Schema version for refresh tokens. Bump when the semantics of a refresh
+// payload change (added required field, new binding, etc.) — the /token
+// handler rejects any refresh whose `v` doesn't match current, forcing the
+// client to re-authorize instead of trusting a stale-schema token.
+export const REFRESH_VERSION = 2 as const;
 
 export interface RefreshTokenPayload extends JWTPayload {
   rooApiKey: string;
@@ -105,6 +115,8 @@ export interface RefreshTokenPayload extends JWTPayload {
   familyId: string;
   // Granted scope; forwarded to the rotated access token on every refresh.
   scope: string;
+  // Payload schema version; see REFRESH_VERSION.
+  v: typeof REFRESH_VERSION;
   use: 'refresh';
 }
 
@@ -200,10 +212,12 @@ export function decryptAccessToken(jwe: string): Promise<AccessTokenPayload> {
 }
 
 export function mintRefreshToken(
-  payload: Omit<RefreshTokenPayload, 'use' | keyof JWTPayload>,
+  payload: Omit<RefreshTokenPayload, 'use' | 'v' | keyof JWTPayload>,
   ttlSeconds = 60 * 60 * 24 * 90,
 ): Promise<string> {
-  return mint({ payload: { ...payload, use: 'refresh' }, ttlSeconds });
+  // v is stamped here so every mint path automatically carries the current
+  // schema version; callers never need to know about it.
+  return mint({ payload: { ...payload, use: 'refresh', v: REFRESH_VERSION }, ttlSeconds });
 }
 
 export function decryptRefreshToken(jwe: string): Promise<RefreshTokenPayload> {

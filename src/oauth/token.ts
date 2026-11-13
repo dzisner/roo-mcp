@@ -15,6 +15,7 @@ import {
   DEFAULT_SCOPE,
   mintAccessToken,
   mintRefreshToken,
+  REFRESH_VERSION,
 } from './jwe.js';
 import { markCodeUsed, rotateRefresh } from './grants.js';
 
@@ -94,6 +95,18 @@ async function handleAuthorizationCode(body: URLSearchParams): Promise<Response>
     return errorJson(400, 'invalid_grant', 'Authorization code is invalid or expired.');
   }
 
+  // F03 (Wave 7): consume BEFORE validation. OAuth 2.1 §4.1.3 and §9.6 require
+  // that any successfully-decrypted code be burned on redemption attempt, win
+  // or lose. Doing the single-use check after PKCE would let an attacker
+  // holding a stolen code brute-force the PKCE verifier up to the code's
+  // natural expiry. The entropy makes that infeasible in practice, but policy
+  // shouldn't depend on an attacker's compute budget.
+  const exp = typeof payload.exp === 'number' ? payload.exp : Math.floor(Date.now() / 1000) + 300;
+  const used = await markCodeUsed(payload.jti, exp);
+  if (used === 'replay') {
+    return errorJson(400, 'invalid_grant', 'Authorization code has already been used.');
+  }
+
   if (payload.redirectUri !== redirectUri) {
     return errorJson(400, 'invalid_grant', 'redirect_uri does not match the one bound to this code.');
   }
@@ -104,12 +117,16 @@ async function handleAuthorizationCode(body: URLSearchParams): Promise<Response>
     return errorJson(400, 'invalid_grant', 'PKCE verifier does not match code_challenge.');
   }
 
-  // F03: single-use. First call wins; a replay — even one happening a few
-  // milliseconds later from a stolen code — gets rejected here.
-  const exp = typeof payload.exp === 'number' ? payload.exp : Math.floor(Date.now() / 1000) + 300;
-  const used = await markCodeUsed(payload.jti, exp);
-  if (used === 'replay') {
-    return errorJson(400, 'invalid_grant', 'Authorization code has already been used.');
+  // F07 (Wave 7): if the client passed `resource` on /token, it must match the
+  // resource the code was issued for. Silent mismatch would issue a token
+  // whose `aud` disagrees with what the client thinks it asked for.
+  const requestedResource = body.get('resource');
+  if (requestedResource && requestedResource !== payload.resource) {
+    return errorJson(
+      400,
+      'invalid_target',
+      `resource does not match the one bound to this code. Code was issued for "${payload.resource}".`,
+    );
   }
 
   // New grant → new family. Later refresh rotations keep this familyId so
@@ -125,13 +142,42 @@ async function handleAuthorizationCode(body: URLSearchParams): Promise<Response>
 
 async function handleRefreshToken(body: URLSearchParams): Promise<Response> {
   const refreshToken = body.get('refresh_token');
+  const clientId = body.get('client_id');
   if (!refreshToken) return errorJson(400, 'invalid_request', 'Missing refresh_token.');
+  // F02 (Wave 7): client_id required on refresh. OAuth 2.1 §6.2 allows it to be
+  // optional, but since we're a public-client-with-PKCE issuer the client_id is
+  // the client's only identifier. Requiring it closes the door on a stolen
+  // refresh being used by any client registration.
+  if (!clientId) return errorJson(400, 'invalid_request', 'Missing client_id.');
 
   let payload;
   try {
     payload = await decryptRefreshToken(refreshToken);
   } catch {
     return errorJson(400, 'invalid_grant', 'Refresh token is invalid or expired.');
+  }
+
+  // F02 (Wave 7): legacy-refresh reject. Refreshes minted before this wave
+  // don't carry `v: 2` and cannot be trusted under the new client-binding
+  // rules. In practice there are no production clients yet, but this scaffolds
+  // the next key/schema rotation — bump `v` and every outstanding refresh
+  // automatically returns an invalid_grant with a reconnect hint.
+  if (payload.v !== REFRESH_VERSION) {
+    return errorJson(
+      400,
+      'invalid_grant',
+      'This refresh token was issued before the latest security update. Reconnect to continue.',
+    );
+  }
+
+  // F02 (Wave 7): client-id binding. A refresh token belongs to the client it
+  // was issued for; another client registration cannot present it.
+  if (payload.clientId !== clientId) {
+    return errorJson(
+      400,
+      'invalid_grant',
+      'client_id does not match the one this refresh token was issued to.',
+    );
   }
 
   // F02: rotate. If this jti is seen for the second time, the whole family dies.

@@ -13,7 +13,7 @@
 // did NOT initiate this flow (phishing) sees an unfamiliar app name and bails.
 import { randomUUID } from 'node:crypto';
 import { RooClient } from '../roo-client.js';
-import { decryptClientId, DEFAULT_SCOPE, mintAuthCode, MCP_REQUIRED_SCOPE } from './jwe.js';
+import { decryptClientId, DEFAULT_SCOPE, mintAuthCode, MCP_REQUIRED_SCOPE, MCP_RESOURCE } from './jwe.js';
 import { ROO_ICON_DATA_URL } from '../icon.js';
 
 interface AuthorizeParams {
@@ -24,6 +24,9 @@ interface AuthorizeParams {
   codeChallengeMethod: string | null;
   state: string | null;
   scope: string | null;
+  // RFC 8707 resource indicator. The resource the client is asking a token for.
+  // We only serve MCP_RESOURCE today; anything else is rejected at validation.
+  resource: string | null;
 }
 
 function readParams(input: URLSearchParams): AuthorizeParams {
@@ -35,6 +38,7 @@ function readParams(input: URLSearchParams): AuthorizeParams {
     codeChallengeMethod: input.get('code_challenge_method'),
     state: input.get('state'),
     scope: input.get('scope'),
+    resource: input.get('resource'),
   };
 }
 
@@ -380,28 +384,100 @@ function validateRequestedScope(scope: string | null): string | null {
   return null;
 }
 
+// F07 (Wave 7): validate the RFC 8707 `resource` param. We serve exactly one
+// resource (MCP_RESOURCE) today; a client that asks for anything else is
+// almost certainly using the wrong authorization server and should get a
+// clean invalid_target rather than a silently-wrong token.
+function validateRequestedResource(resource: string | null): string | null {
+  if (!resource || resource.trim() === '') return null;
+  if (resource.trim() !== MCP_RESOURCE) {
+    return `Unsupported resource: "${resource}". This authorization server only issues tokens for "${MCP_RESOURCE}".`;
+  }
+  return null;
+}
+
+// F07 (Wave 7): error-contract classification. "fatal" errors are shown as an
+// HTML page because we have no safe redirect target; "redirectable" errors go
+// back to the client's registered redirect_uri as query params per OAuth 2.1
+// §4.1.2.1, so the client can surface the problem in its own UI.
+type OAuthError =
+  | 'invalid_request'
+  | 'unsupported_response_type'
+  | 'invalid_scope'
+  | 'invalid_target';
+
+interface ValidationIssue {
+  kind: 'fatal' | 'redirectable';
+  code: OAuthError;
+  message: string;
+}
+
 function validateParams(
   params: AuthorizeParams,
   registeredRedirects: string[],
-): string | null {
-  if (params.responseType !== 'code') {
-    return `Unsupported response_type: ${params.responseType ?? '(missing)'}. Only "code" is supported.`;
-  }
-  if (params.codeChallengeMethod !== 'S256') {
-    return `Unsupported code_challenge_method: ${params.codeChallengeMethod ?? '(missing)'}. Only "S256" is supported.`;
-  }
-  if (!params.codeChallenge) {
-    return 'Missing code_challenge. PKCE is required.';
-  }
+): ValidationIssue | null {
+  // Resolve redirect_uri FIRST. Without a trustworthy redirect we can't bounce
+  // the client — any later error becomes an HTML page instead. Bouncing to an
+  // unverified redirect_uri would be a phishing pipe.
   if (!params.redirectUri) {
-    return 'Missing redirect_uri.';
+    return { kind: 'fatal', code: 'invalid_request', message: 'Missing redirect_uri.' };
   }
   if (!redirectUriMatches(params.redirectUri, registeredRedirects)) {
-    return `redirect_uri "${params.redirectUri}" is not registered for this client.`;
+    return {
+      kind: 'fatal',
+      code: 'invalid_request',
+      message: `redirect_uri "${params.redirectUri}" is not registered for this client.`,
+    };
+  }
+  // From here on, redirect_uri is proven safe; errors go back to the client.
+  if (params.responseType !== 'code') {
+    return {
+      kind: 'redirectable',
+      code: 'unsupported_response_type',
+      message: `Unsupported response_type: ${params.responseType ?? '(missing)'}. Only "code" is supported.`,
+    };
+  }
+  if (params.codeChallengeMethod !== 'S256') {
+    return {
+      kind: 'redirectable',
+      code: 'invalid_request',
+      message: `Unsupported code_challenge_method: ${params.codeChallengeMethod ?? '(missing)'}. Only "S256" is supported.`,
+    };
+  }
+  if (!params.codeChallenge) {
+    return {
+      kind: 'redirectable',
+      code: 'invalid_request',
+      message: 'Missing code_challenge. PKCE is required.',
+    };
   }
   const scopeErr = validateRequestedScope(params.scope);
-  if (scopeErr) return scopeErr;
+  if (scopeErr) return { kind: 'redirectable', code: 'invalid_scope', message: scopeErr };
+  const resourceErr = validateRequestedResource(params.resource);
+  if (resourceErr) return { kind: 'redirectable', code: 'invalid_target', message: resourceErr };
   return null;
+}
+
+// F07 (Wave 7): redirect-with-error per OAuth 2.1 §4.1.2.1. Carries `state`
+// back so the client can correlate the bounce with the request it sent.
+function redirectWithError(
+  redirectUri: string,
+  code: OAuthError,
+  description: string,
+  state: string | null,
+): Response {
+  const url = new URL(redirectUri);
+  url.searchParams.set('error', code);
+  url.searchParams.set('error_description', description);
+  if (state) url.searchParams.set('state', state);
+  return new Response(null, {
+    status: 302,
+    headers: {
+      location: url.toString(),
+      'cache-control': 'no-store',
+      'referrer-policy': 'no-referrer',
+    },
+  });
 }
 
 // Resolve the scope to persist with this grant. Clients that omit `scope`
@@ -422,7 +498,10 @@ export async function handleAuthorizeGet(request: Request): Promise<Response> {
   if (!client.ok) return renderErrorPage('Invalid client', client.reason);
 
   const err = validateParams(params, client.redirectUris);
-  if (err) return renderErrorPage('Invalid authorization request', err);
+  if (err?.kind === 'fatal') return renderErrorPage('Invalid authorization request', err.message);
+  if (err?.kind === 'redirectable') {
+    return redirectWithError(params.redirectUri!, err.code, err.message, params.state);
+  }
 
   return renderForm({
     params,
@@ -444,7 +523,10 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
   if (!client.ok) return renderErrorPage('Invalid client', client.reason);
 
   const err = validateParams(params, client.redirectUris);
-  if (err) return renderErrorPage('Invalid authorization request', err);
+  if (err?.kind === 'fatal') return renderErrorPage('Invalid authorization request', err.message);
+  if (err?.kind === 'redirectable') {
+    return redirectWithError(params.redirectUri!, err.code, err.message, params.state);
+  }
 
   if (!apiKey) {
     return renderForm({
@@ -481,6 +563,10 @@ export async function handleAuthorizePost(request: Request): Promise<Response> {
     // Carry the granted scope into the code so /token can mint access/refresh
     // tokens with it (F01).
     scope: resolveGrantedScope(params.scope),
+    // F07 (Wave 7): bind the resource the client asked for (or the default MCP
+    // resource if omitted) so /token can verify the exchange is for the same
+    // resource and the minted access token's `aud` is honest.
+    resource: MCP_RESOURCE,
   });
 
   const redirect = new URL(params.redirectUri!);
