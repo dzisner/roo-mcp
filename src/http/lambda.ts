@@ -52,6 +52,31 @@ function unauthorizedMcp(): Response {
   );
 }
 
+// 405 for anything that isn't POST on /mcp. We run the transport in
+// enableJsonResponse mode, so GET (SSE) is not supported — rejecting it here
+// gives a clean, machine-readable response instead of whatever the transport
+// would say. RFC 7231 §6.5.5 requires the Allow header on 405.
+function methodNotAllowedMcp(): Response {
+  return new Response(
+    JSON.stringify({
+      jsonrpc: '2.0',
+      error: {
+        code: -32600,
+        message:
+          'Only POST is allowed on /mcp. This server runs in JSON-response mode and does not support SSE streaming (GET).',
+      },
+      id: null,
+    }),
+    {
+      status: 405,
+      headers: {
+        'content-type': 'application/json',
+        allow: 'POST',
+      },
+    },
+  );
+}
+
 // 403 for tokens that decrypt but don't carry the scope /mcp requires. RFC 6750
 // §3.1 says to use `insufficient_scope` and advertise the required scope so the
 // client knows what to ask for on its next /authorize.
@@ -141,6 +166,12 @@ async function authenticateMcp(event: APIGatewayProxyEventV2): Promise<McpAuth> 
 }
 
 async function handleMcp(event: APIGatewayProxyEventV2): Promise<APIGatewayProxyStructuredResultV2> {
+  // F01: only POST is valid on /mcp. Rejecting other methods (GET, HEAD, PUT,
+  // DELETE, OPTIONS, etc.) here means the auth path and the transport only ever
+  // see requests they are built to handle.
+  if (event.requestContext.http.method !== 'POST') {
+    return toApiGwResponse(methodNotAllowedMcp());
+  }
   const auth = await authenticateMcp(event);
   if (auth.kind === 'unauthenticated') return toApiGwResponse(unauthorizedMcp());
   if (auth.kind === 'insufficient_scope') return toApiGwResponse(forbiddenInsufficientScope());

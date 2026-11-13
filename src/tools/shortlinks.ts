@@ -24,6 +24,7 @@ import type {
   RooCustomDomainRecord,
 } from '../types.js';
 import { RooError } from '../errors.js';
+import { redactAddOnForModel } from './redact.js';
 import {
   scheduledRedirectFields,
   clickCountRedirectFields,
@@ -210,6 +211,7 @@ export function registerShortlinkTools(server: McpServer, client: RooClient): vo
       description:
         'List shortlinks on the account (cursor-paginated, most-recent first). Returns compact items — call roo_get_shortlink for full detail on one.',
       inputSchema: ListInputSchema,
+      annotations: { readOnlyHint: true, openWorldHint: true, idempotentHint: true },
     },
     async ({ limit, cursor }) => {
       const q = new URLSearchParams();
@@ -235,6 +237,10 @@ export function registerShortlinkTools(server: McpServer, client: RooClient): vo
       description:
         'Create a shortlink that redirects to `url`. Optionally attach to a custom domain, request a slug, and/or configure add-ons up front. Passing `add_ons` creates the shortlink AND attaches every listed add-on in a single API call. When `add_ons.qr` is included, the pre-rendered QR image comes back inline in the response.',
       inputSchema: CreateInputSchema,
+      // Not destructive (creates a new resource); not idempotent (each call
+      // mints a new shortlink id). openWorld because it mutates account state
+      // via the Roo API.
+      annotations: { destructiveHint: false, openWorldHint: true, idempotentHint: false },
     },
     async ({ url, custom_domain, add_ons }) => {
       const body: RooShortlinkCreateBody = { url };
@@ -290,8 +296,9 @@ export function registerShortlinkTools(server: McpServer, client: RooClient): vo
     {
       title: 'Roo — get shortlink',
       description:
-        'Fetch full detail of one shortlink by id — destination, custom domain, click count, permanence, folder, description, and any add-ons.',
+        'Fetch full detail of one shortlink by id — destination, custom domain, click count, permanence, folder, description, and any add-ons. Webhook secrets (endpoint path/query, header values, body) are redacted before being returned.',
       inputSchema: GetInputSchema,
+      annotations: { readOnlyHint: true, openWorldHint: true, idempotentHint: true },
     },
     async ({ id }) => {
       const res = await client.get<RooShortlinkRecord>(`/v1/urls/${encodeRooId(id)}`);
@@ -312,6 +319,9 @@ export function registerShortlinkTools(server: McpServer, client: RooClient): vo
       description:
         'Update a shortlink. Change the destination URL and/or the custom-domain binding. Only fields you pass are sent. To change add-ons, use the roo_set_* tools; to make/unmake permanent, use roo_make_permanent.',
       inputSchema: UpdateInputSchema,
+      // destructiveHint because changing the destination overwrites the prior
+      // target; readers of the short URL now land somewhere else.
+      annotations: { destructiveHint: true, openWorldHint: true, idempotentHint: true },
     },
     async ({ id, url, custom_domain }) => {
       const body: RooShortlinkPatchBody = {};
@@ -343,6 +353,8 @@ export function registerShortlinkTools(server: McpServer, client: RooClient): vo
       description:
         "Mark a shortlink as permanent — it stops participating in the plan's auto-expiry (Hop = 90 days). Counts against the account's permanent-shortlink limit. To un-make a link permanent, use roo_update_permanent_settings with { permanent: false }.",
       inputSchema: MakePermanentInputSchema,
+      // Additive flag: safer-than-delete. Not destructive.
+      annotations: { destructiveHint: false, openWorldHint: true, idempotentHint: true },
     },
     async ({ id }) => {
       const body: RooPermanentSettingsPatchBody = { permanent: true };
@@ -367,6 +379,8 @@ export function registerShortlinkTools(server: McpServer, client: RooClient): vo
       description:
         "Update permanent-mode settings on a shortlink. Today the only verified field is `permanent` (true/false) — additional fields may be accepted by the endpoint in the future; only fields you pass are sent.",
       inputSchema: UpdatePermanentSettingsInputSchema,
+      // Can un-make permanent, which puts a link back on the auto-expiry path.
+      annotations: { destructiveHint: true, openWorldHint: true, idempotentHint: true },
     },
     async ({ id, permanent }) => {
       const body: RooPermanentSettingsPatchBody = {};
@@ -398,6 +412,7 @@ export function registerShortlinkTools(server: McpServer, client: RooClient): vo
       description:
         'List every custom domain attached to the account, with each one\'s status and verification details. Authoritative — this is the same data the Roo web app uses. Distinct from the domain a particular SHORTLINK is on (a shortlink can be on `roo.ws` or `roo.bz` — Roo-owned defaults — without any custom domain being attached).',
       inputSchema: ListCustomDomainsInputSchema,
+      annotations: { readOnlyHint: true, openWorldHint: true, idempotentHint: true },
     },
     async ({ status_filter }) => {
       const q = new URLSearchParams();
@@ -435,6 +450,7 @@ export function registerShortlinkTools(server: McpServer, client: RooClient): vo
       description:
         'Fetch the QR image for a shortlink. Requires the qrCode add-on to already be configured on the shortlink (via roo_set_qr_addon) — otherwise Roo returns a qr_not_enabled error. Returns the image inline as an MCP image content block; the client renders it directly. The user can save it from the chat UI (right-click → Save Image, or the client\'s download button).',
       inputSchema: GetQrCodeInputSchema,
+      annotations: { readOnlyHint: true, openWorldHint: true, idempotentHint: true },
     },
     async ({ id }) => {
       const res = await client.get<RooQrCodeResponse>(
@@ -493,7 +509,12 @@ function normalizeShortlink(raw: RooShortlinkRecord): NormalizedShortlink {
 }
 
 function normalizeAddOn(a: RooAddOn): NormalizedAddOn {
-  return { type: a.addOn, enabled: a.enabled, data: a.data };
+  // F04 — scrub webhook secrets (endpoint path/query, header values, query
+  // params, body) before handing the add-on to the model. The model already
+  // has the shortlink id, so it can call roo_set_webhook to change the
+  // webhook without needing to see the current secret.
+  const safe = redactAddOnForModel(a);
+  return { type: safe.addOn, enabled: safe.enabled, data: safe.data };
 }
 
 interface NormalizedCustomDomain {

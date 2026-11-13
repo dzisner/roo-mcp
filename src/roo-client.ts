@@ -23,9 +23,47 @@ const DEFAULT_BASE_URL = 'https://api.roo.bz';
  * padded id — all succeeded with raw `=`, all failed with `%3D`. See SPEC-NOTES.md.
  */
 export function encodeRooId(id: string): string {
+  // F05 — validate FIRST so a crafted id cannot reach the Roo API as part of a
+  // URL path, even indirectly. Every call site that builds a Roo path via this
+  // helper gets the check for free.
+  validateRooId(id);
   // `+` and `/` are the base64 characters that would break the path; everything else
   // in a Roo id is alphanumeric or `=`, all of which pass through untouched.
   return id.replace(/[+/]/g, (c) => encodeURIComponent(c));
+}
+
+/**
+ * F05 — validate a shortlink id before it reaches the Roo API.
+ *
+ * Roo mints ids as `base64(host + "/" + slug)`, so the id is always drawn from
+ * the standard base64 alphabet (`A-Z a-z 0-9 + / =`). Anything outside that
+ * alphabet — control chars, Unicode tricks, path-traversal segments, URL-
+ * injection payloads — is guaranteed to be either a mistake or an attack, and
+ * MUST be rejected at the tool boundary rather than URL-encoded and sent to
+ * Roo. Length bounds are generous (host+slug keeps ids short in practice; the
+ * upper bound catches obvious abuse without being tight to today's usage).
+ *
+ * Throws RooError('invalid_id', ...) rather than returning false so callers
+ * can't accidentally forget to check the return value.
+ */
+const ROO_ID_PATTERN = /^[A-Za-z0-9+/=]+$/;
+const ROO_ID_MIN_LENGTH = 4;
+const ROO_ID_MAX_LENGTH = 256;
+
+export function validateRooId(id: string, label: string = 'id'): void {
+  if (typeof id !== 'string' || id.length === 0) {
+    throw new Error(`${label} is required.`);
+  }
+  if (id.length < ROO_ID_MIN_LENGTH || id.length > ROO_ID_MAX_LENGTH) {
+    throw new Error(
+      `${label} must be between ${ROO_ID_MIN_LENGTH} and ${ROO_ID_MAX_LENGTH} characters (got ${id.length}).`,
+    );
+  }
+  if (!ROO_ID_PATTERN.test(id)) {
+    throw new Error(
+      `${label} contains characters outside the Roo shortlink alphabet (A-Z, a-z, 0-9, +, /, =). This is not a valid Roo shortlink id.`,
+    );
+  }
 }
 
 export interface RooClientOptions {

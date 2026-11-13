@@ -15,6 +15,7 @@ export function registerAccountTools(server: McpServer, client: RooClient): void
       description:
         'Verify the Roo API key and return a compact account summary (email, plan, limits, subscription dates). Use to check that Roo access is working before other operations.',
       inputSchema: {},
+      annotations: { readOnlyHint: true, openWorldHint: true, idempotentHint: true },
     },
     async () => {
       const me = await client.get<RooMeResponse>('/v1/me');

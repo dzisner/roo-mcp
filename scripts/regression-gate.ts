@@ -21,6 +21,8 @@ const { markCodeUsed, rotateRefresh, __resetMemoryStoreForTests } = await import
   '../src/oauth/grants.js'
 );
 const { mintAccessToken, MCP_REQUIRED_SCOPE } = await import('../src/oauth/jwe.js');
+const { redactAddOnForModel } = await import('../src/tools/redact.js');
+const { encodeRooId, validateRooId } = await import('../src/roo-client.js');
 
 import type {
   APIGatewayProxyEventV2,
@@ -80,6 +82,18 @@ function mkEvent(overrides: {
 
 async function run(): Promise<void> {
   console.log('\n== Security regression gate ==\n');
+
+  // --- F01: /mcp rejects non-POST methods with 405 + Allow: POST BEFORE
+  // consulting auth. GET is the SSE path in the MCP streamable-HTTP transport,
+  // which we don't support in JSON-response mode.
+  {
+    for (const method of ['GET', 'PUT', 'DELETE', 'OPTIONS'] as const) {
+      const res = await handler(mkEvent({ path: '/mcp', method }));
+      assert('F01', `/mcp ${method} → 405`, res.statusCode === 405, `got ${res.statusCode}`);
+      const allow = (res.headers as Record<string, string>)?.['allow'] ?? '';
+      assert('F01', `/mcp ${method} 405 includes Allow: POST`, allow === 'POST', `got: ${allow}`);
+    }
+  }
 
   // --- F01: /mcp without any credentials → 401 + WWW-Authenticate pointing at
   // the resource_metadata URL so OAuth clients can discover the AS.
@@ -221,6 +235,101 @@ async function run(): Promise<void> {
       '/authorize response carries Referrer-Policy',
       typeof h['referrer-policy'] === 'string' && h['referrer-policy'].length > 0,
     );
+  }
+
+  // --- F04: webhook secrets must not round-trip to the model. The redactor
+  // strips endpoint path/query, every header value, every queryString value,
+  // and any non-trivial body. Host is preserved so the model can still tell
+  // which service the webhook posts to.
+  {
+    const input = {
+      addOn: 'webhook' as const,
+      enabled: true,
+      data: {
+        endpoint: 'https://hooks.slack.com/services/T1/B2/VERY_SECRET_TOKEN',
+        headers: { Authorization: 'Bearer sk-live-12345', 'X-Not-Secret': 'ok' },
+        queryString: { api_key: 'live-abcdef' },
+        body: '{"text": "hi"}',
+      },
+    };
+    const safe = redactAddOnForModel(input) as typeof input;
+    const serialized = JSON.stringify(safe);
+    assert('F04', 'webhook endpoint path redacted', !serialized.includes('VERY_SECRET_TOKEN'));
+    assert('F04', 'webhook endpoint host preserved', serialized.includes('hooks.slack.com'));
+    assert('F04', 'webhook Authorization header redacted', !serialized.includes('sk-live-12345'));
+    assert('F04', 'webhook queryString value redacted', !serialized.includes('live-abcdef'));
+    assert(
+      'F04',
+      'non-webhook add-ons pass through unchanged',
+      JSON.stringify(
+        redactAddOnForModel({
+          addOn: 'scheduledRedirect' as const,
+          enabled: true,
+          data: { waypoints: [{ url: 'https://example.com', at: 'now' }] },
+        }),
+      ).includes('example.com'),
+    );
+  }
+
+  // --- F05: shortlink IDs must be base64 alphabet, 4-256 chars. Anything
+  // else is rejected BEFORE being URL-encoded and sent to Roo.
+  {
+    const bad: Array<[string, string]> = [
+      ['abc', 'too short'],
+      ['a'.repeat(300), 'too long'],
+      ['bad id with space', 'invalid chars (space)'],
+      ['bad-id-with-dashes', 'invalid chars (dash)'],
+      ['../../etc/passwd', 'path traversal'],
+      ['bad\u0000nul', 'control char'],
+      ['中文中文', 'non-ASCII'],
+    ];
+    for (const [id, label] of bad) {
+      let threw = false;
+      try {
+        validateRooId(id);
+      } catch {
+        threw = true;
+      }
+      assert('F05', `validateRooId rejects ${label}`, threw, `${label} did not throw`);
+    }
+    // Real-looking Roo IDs pass.
+    const good = ['cm3abc123', 'ZXhhbXBsZS5jb20vYWJjZA==', 'cHJvZHVjdGlvbi9zbHVn'];
+    for (const id of good) {
+      let threw = false;
+      try {
+        validateRooId(id);
+      } catch {
+        threw = true;
+      }
+      assert('F05', `validateRooId accepts real id ${id.slice(0, 16)}...`, !threw);
+    }
+    // encodeRooId wraps validateRooId so every call site gets the check.
+    let encodeThrew = false;
+    try {
+      encodeRooId('bad id');
+    } catch {
+      encodeThrew = true;
+    }
+    assert('F05', 'encodeRooId rejects invalid id', encodeThrew);
+  }
+
+  // --- F12: every registered tool has an `annotations:` block. We static-scan
+  // the tool source files rather than probe the live MCP server, because the
+  // SDK does not expose a stable introspection API. One `annotations:` key
+  // per `registerTool(` call is the floor.
+  {
+    const fs = await import('node:fs/promises');
+    const files = ['src/tools/account.ts', 'src/tools/addons.ts', 'src/tools/shortlinks.ts'];
+    for (const f of files) {
+      const src = await fs.readFile(new URL(`../${f}`, import.meta.url), 'utf8');
+      const toolCount = (src.match(/\.registerTool\s*\(/g) ?? []).length;
+      const annotationCount = (src.match(/^\s*annotations:\s*\{/gm) ?? []).length;
+      assert(
+        'F12',
+        `${f}: every registerTool has annotations (${annotationCount}/${toolCount})`,
+        toolCount > 0 && annotationCount >= toolCount,
+      );
+    }
   }
 
   // --- F10: package.json uses the scoped name clients will install.

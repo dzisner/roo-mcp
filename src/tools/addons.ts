@@ -315,6 +315,8 @@ export function registerAddOnTools(server: McpServer, client: RooClient): void {
       description:
         'Time-based redirect: attach or replace waypoints on the shortlink. Each waypoint is a { url, at } pair — at time T the redirect switches to `url` and stays until the next waypoint. Before the first waypoint the shortlink falls through to its base url. Roo has no timezone or per-waypoint end field.',
       inputSchema: ScheduledRedirectToolInput,
+      // Replaces the full waypoint list, destroying any prior schedule.
+      annotations: { destructiveHint: true, openWorldHint: true, idempotentHint: true },
     },
     async ({ id, waypoints }) => {
       const data = buildScheduledRedirectData({ waypoints });
@@ -338,6 +340,7 @@ export function registerAddOnTools(server: McpServer, client: RooClient): void {
       description:
         'Click-count redirect: attach or replace cumulative thresholds on the shortlink. After the shortlink accumulates click_count clicks, the destination switches to `url` and stays until the next threshold. Order thresholds by increasing click_count; the tool re-sorts.',
       inputSchema: ClickCountRedirectToolInput,
+      annotations: { destructiveHint: true, openWorldHint: true, idempotentHint: true },
     },
     async ({ id, thresholds }) => {
       const data = buildClickCountRedirectData({ thresholds });
@@ -361,6 +364,7 @@ export function registerAddOnTools(server: McpServer, client: RooClient): void {
       description:
         'Fire an HTTP request to `endpoint` on every click. Roo requires 8 fields; this tool defaults 7 of them — you only need to provide the endpoint. The webhook does NOT change where the shortlink redirects to; the destination is unchanged.',
       inputSchema: WebhookToolInput,
+      annotations: { destructiveHint: true, openWorldHint: true, idempotentHint: true },
     },
     async ({ id, endpoint, name, method, content_type, body, headers, query_string, add_metadata }) => {
       const data = buildWebhookData(
@@ -384,6 +388,7 @@ export function registerAddOnTools(server: McpServer, client: RooClient): void {
       description:
         "Control how the shortlink unfurls on social/chat (Open Graph title/description/image). `image` accepts either a base64 data URI for a new upload, or a previously-returned image_url to keep the current image.",
       inputSchema: PreviewLinkToolInput,
+      annotations: { destructiveHint: true, openWorldHint: true, idempotentHint: true },
     },
     async ({ id, title, description, image }) => {
       const { data, image_kind } = buildPreviewLinkData({ title, description, image });
@@ -407,6 +412,7 @@ export function registerAddOnTools(server: McpServer, client: RooClient): void {
       description:
         'Configure and enable the QR code add-on on a shortlink. Roo requires all 6 fields; the tool defaults them all. After this succeeds, use roo_get_qr_code to fetch the rendered image.',
       inputSchema: QrAddonToolInput,
+      annotations: { destructiveHint: true, openWorldHint: true, idempotentHint: true },
     },
     async ({ id, code_color, background_color, style, scale, logo, display_roo_logo }) => {
       const data = buildQrCodeData({ code_color, background_color, style, scale, logo, display_roo_logo });
