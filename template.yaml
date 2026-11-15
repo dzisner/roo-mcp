@@ -141,6 +141,16 @@ Resources:
           - src/http/lambda.ts
         OutExtension:
           - .js=.mjs
+        # The AWS SDK v3 packages (and their @smithy/* transitive deps) ship as
+        # CJS. Bundling them into our ESM output makes esbuild inject a dynamic
+        # `__require2` shim, which can't resolve Node built-ins like node:https
+        # — cold start then crashes with "Dynamic require of 'node:https' is
+        # not supported" before the handler is reached. Externalizing them is
+        # the fix: Lambda's nodejs22.x runtime ships @aws-sdk/* v3 preinstalled,
+        # so the runtime resolver finds them at import time, no bundling needed.
+        External:
+          - "@aws-sdk/*"
+          - "@smithy/*"
 
 Outputs:
   CustomDomain:
