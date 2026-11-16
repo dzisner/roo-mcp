@@ -580,6 +580,31 @@ async function run(): Promise<void> {
     delete process.env.ROO_MCP_BUILD_SHA;
   }
 
+  // --- Branding (cosmetic, not a security finding): /favicon.ico + /logo.png
+  // 302 to the hosted Roo PNG, discovery docs ship with a short cache so
+  // installs don't carry a stale snapshot. Guards against someone bumping the
+  // TTL back up or removing the favicon fallback.
+  {
+    const favRes = await handler(mkEvent({ path: '/favicon.ico', method: 'GET' }));
+    assert('BRAND', '/favicon.ico → 302', favRes.statusCode === 302);
+    assert(
+      'BRAND',
+      '/favicon.ico redirects to roo.bz logo',
+      typeof favRes.headers?.location === 'string' &&
+        (favRes.headers.location as string).includes('roo.bz'),
+    );
+    const logoRes = await handler(mkEvent({ path: '/logo.png', method: 'GET' }));
+    assert('BRAND', '/logo.png → 302', logoRes.statusCode === 302);
+
+    const asRes = await handler(
+      mkEvent({ path: '/.well-known/oauth-authorization-server', method: 'GET' }),
+    );
+    const cc = (asRes.headers?.['cache-control'] as string) ?? '';
+    const m = cc.match(/max-age=(\d+)/);
+    const maxAge = m ? Number(m[1]) : Infinity;
+    assert('BRAND', 'discovery cache-control max-age ≤ 300', maxAge <= 300);
+  }
+
   // --- F11 (Wave 8): ROTATION.md exists and documents the two rotation flows.
   {
     const fs = await import('node:fs/promises');

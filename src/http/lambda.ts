@@ -243,6 +243,23 @@ export const handler = async (
   const method = event.requestContext.http.method;
   const path = event.rawPath || '/';
 
+  // Favicon + logo. Some connector hosts (notably ChatGPT's installed-plugins
+  // list) look up the host's favicon as a fallback icon rather than reading
+  // logo_uri from OAuth discovery. Serve both paths as a 302 to the Roo
+  // marketing site's CloudFront-hosted PNG — no binary bytes travel through
+  // this Lambda, and the browser caches the resolved image aggressively.
+  if ((path === '/favicon.ico' || path === '/logo.png') && method === 'GET') {
+    return {
+      statusCode: 302,
+      headers: {
+        location:
+          'https://www.roo.bz/lovable-uploads/64cc0257-07de-41b0-9d55-8f02000a5d29.png',
+        'cache-control': 'public, max-age=86400',
+      },
+      body: '',
+    };
+  }
+
   if (path === '/health') {
     // F10 (Wave 8): surface the package version + build SHA so a client can
     // tell exactly which build is live without reading CloudWatch. Both are

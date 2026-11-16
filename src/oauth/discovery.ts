@@ -22,8 +22,13 @@ function json(body: unknown): Response {
     status: 200,
     headers: {
       'content-type': 'application/json',
-      // 10 min cache — spec says these can be cached. Not aggressive; room to iterate.
-      'cache-control': 'public, max-age=600',
+      // 60s cache. Short enough that a branding or endpoint change propagates
+      // to connector installers (ChatGPT, Claude Desktop) within a minute —
+      // long enough to spare DDB/Lambda during the tight polling MCP hosts do
+      // during an install. Was 600s; the first logo rollout showed that
+      // installs snapshot discovery at install time and a longer TTL means
+      // users carry the stale snapshot for the full window.
+      'cache-control': 'public, max-age=60',
     },
   });
 }
