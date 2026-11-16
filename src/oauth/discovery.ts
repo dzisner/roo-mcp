@@ -9,6 +9,14 @@
 // Both are read-only, cacheable JSON; same across all requests.
 import { JWE_ISSUER } from './jwe.js';
 
+// Branding. ChatGPT and other MCP hosts render a connector card with an icon;
+// without a logo URL they fall back to a generic placeholder. The URL points
+// to the Roo marketing site's own hosted PNG (CloudFront-fronted, 24KB), so
+// no asset ships from this Lambda.
+const ROO_LOGO_URI =
+  'https://www.roo.bz/lovable-uploads/64cc0257-07de-41b0-9d55-8f02000a5d29.png';
+const ROO_HOMEPAGE_URI = 'https://www.roo.bz';
+
 function json(body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status: 200,
@@ -32,6 +40,11 @@ export function authorizationServerMetadata(): Response {
     token_endpoint_auth_methods_supported: ['none'],
     scopes_supported: ['mcp:all'],
     service_documentation: 'https://github.com/dzisner/roo-mcp',
+    // op_* fields are OIDC Discovery conventions that MCP hosts (notably
+    // ChatGPT) honor to render the connector card.
+    op_policy_uri: `${ROO_HOMEPAGE_URI}/privacy`,
+    op_tos_uri: `${ROO_HOMEPAGE_URI}/terms`,
+    logo_uri: ROO_LOGO_URI,
   });
 }
 
@@ -41,5 +54,11 @@ export function protectedResourceMetadata(): Response {
     authorization_servers: [JWE_ISSUER],
     scopes_supported: ['mcp:all'],
     bearer_methods_supported: ['header'],
+    resource_name: 'Roo',
+    resource_documentation: ROO_HOMEPAGE_URI,
+    // Mirrors logo_uri on the AS metadata — some clients read branding from
+    // the PR doc (which they fetch first, from the 401 www-authenticate hint)
+    // and never load the AS doc at all.
+    logo_uri: ROO_LOGO_URI,
   });
 }
